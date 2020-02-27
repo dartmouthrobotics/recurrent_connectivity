@@ -1,0 +1,112 @@
+<launch>
+    <arg name="run" default="0"/>
+    <!-- Some general parameters -->
+    <param name="use_sim_time" value="true" />
+    <!-- Start Stage simulator with a given environment -->
+    <node name="Stage" pkg="stage_ros" type="stageros" args="$(find recurrent_connectivity)/world/maze.world">
+        <param name="base_watchdog_timeout" value="0" />
+    </node>
+
+    <node name="R0_MapAlign" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /map /robot_0/map 100"/>
+    <node name="R1_MapAlign" pkg="tf" type="static_transform_publisher" args="50 0 0 0 0 0 /map /robot_1/map 100"/>
+    <node name="R2_MapAlign" pkg="tf" type="static_transform_publisher" args="100 0 0 0 0 0 /map /robot_2/map 100"/>
+
+    <group ns="robot_0">
+        <param name="robot_id" value="1" />
+        <param name="tf_prefix" type="string" value="robot_0"/>
+        <rosparam file="$(find recurrent_connectivity)/param/ros.yaml"/>
+        <node pkg="nav2d_operator" type="operator" name="operator" output="screen">
+            <rosparam file="$(find recurrent_connectivity)/param/operator.yaml"/>
+            <rosparam file="$(find recurrent_connectivity)/param/costmap1.yaml" ns="local_map" />
+            <param name="robot_frame" value="base_link"/>
+            <param name="odometry_frame" value="odom"/>
+        </node>
+        <node pkg="nav2d_navigator" type="navigator" name="navigator">
+            <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
+            <param name="robot_id" value="1"/>
+        </node>
+        <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
+        <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
+        <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
+        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
+            <param name="robot_id" value="2" />
+            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
+        </node>
+        <include file="$(find recurrent_connectivity)/launch/robot.launch">
+            <arg name="robot_name" value="0" />
+            <arg name="robot_type" value="1" />
+            <arg name="relay_robots" value="1,2" />
+            <arg name="robot_count" value="2"/>
+            <arg name="environment" value="maze"/>
+        </include>
+    </group>
+
+    <group ns="robot_1">
+        <param name="robot_id" value="2" />
+        <param name="tf_prefix" type="string" value="robot_1"/>
+        <rosparam file="$(find recurrent_connectivity)/param/ros.yaml"/>
+        <node pkg="nav2d_operator" type="operator" name="operator" output="screen">
+            <rosparam file="$(find recurrent_connectivity)/param/operator.yaml"/>
+            <rosparam file="$(find recurrent_connectivity)/param/costmap2.yaml" ns="local_map" />
+            <param name="robot_frame" value="base_link"/>
+            <param name="odometry_frame" value="odom"/>
+        </node>
+        <node pkg="nav2d_navigator" type="navigator" name="navigator">
+            <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
+            <param name="robot_id" value="2"/>
+        </node>
+        <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
+        <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
+        <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
+        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
+            <param name="robot_id" value="2" />
+            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
+        </node>
+        <include file="$(find recurrent_connectivity)/launch/robot.launch">
+            <arg name="robot_name" value="1" />
+            <arg name="robot_type" value="2" />
+            <arg name="base_stations" value="0" />
+            <arg name="relay_robots" value="2" />
+            <arg name="robot_count" value="2"/>
+            <arg name="environment" value="maze"/>
+
+        </include>
+    </group>
+
+    <group ns="robot_2">
+        <param name="robot_id" value="3" />
+        <param name="tf_prefix" type="string" value="robot_2"/>
+        <rosparam file="$(find recurrent_connectivity)/param/ros.yaml"/>
+        <node pkg="nav2d_operator" type="operator" name="operator" output="screen">
+            <rosparam file="$(find recurrent_connectivity)/param/operator.yaml"/>
+            <rosparam file="$(find recurrent_connectivity)/param/costmap3.yaml" ns="local_map" />
+            <param name="robot_frame" value="base_link"/>
+            <param name="odometry_frame" value="odom"/>
+        </node>
+        <node pkg="nav2d_navigator" type="navigator" name="navigator">
+            <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
+            <param name="robot_id" value="3"/>
+        </node>
+        <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
+        <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
+        <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
+        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
+            <param name="robot_id" value="2" />
+            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
+        </node>
+        <include file="$(find recurrent_connectivity)/launch/robot.launch">
+            <arg name="robot_name" value="2" />
+            <arg name="robot_type" value="2" />
+            <arg name="base_stations" value="0" />
+            <arg name="relay_robots" value="1" />
+            <arg name="robot_count" value="2"/>
+            <arg name="environment" value="maze"/>
+        </include>
+    </group>
+    <node pkg="recurrent_connectivity" type="map_analyzer.py" name="map_analyzer">
+        <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
+    </node>
+
+    <node name="RVIZ" pkg="rviz" type="rviz" args=" -d $(find recurrent_connectivity)/param/recurrent_connectivity.rviz" output="screen" />
+</launch>
+
