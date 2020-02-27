@@ -87,10 +87,6 @@ class roscbt:
         self.run = rospy.get_param("/robot_0/0/node0/run")
         self.termination_metric = rospy.get_param("/robot_0/0/node0/termination_metric")
 
-        # difference in center of map image and actual simulation
-        self.dx = self.world_center[0] - self.map_pose[0]
-        self.dy = self.world_center[1] - self.map_pose[1]
-
         # import message types
         for topic in self.topics:
             msg_pkg = topic["message_pkg"]
@@ -152,7 +148,6 @@ class roscbt:
         # except Exception as e:
         #     rospy.logerr('interrupted!: {}'.format(e))
         #     break
-
 
     def read_map_image(self, image_path):
         im = Image.open(image_path, 'r')

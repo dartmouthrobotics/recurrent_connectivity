@@ -60,6 +60,7 @@ add_message_files(
    SignalStrength.msg
    RobotRange.msg
    HomeAlert.msg
+   Coverage.msg
  )
 
 ## Generate services in the 'srv' folder

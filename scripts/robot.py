@@ -326,9 +326,11 @@ class Robot:
 
         self.shutdown_pub = rospy.Publisher("/shutdown".format(self.robot_id), String, queue_size=10)
         rospy.Subscriber('/shutdown', String, self.shutdown_callback)
+        rospy.Subscriber('/coverage'.format(self.robot_id), Coverage, self.coverage_callback)
         rospy.on_shutdown(self.save_all_data)
         self.exploration_started = False
         self.is_shutdown_caller = False
+        rospy.on_shutdown(self.save_all_data)
         # ======= pose transformations====================
         self.listener = tf.TransformListener()
 
@@ -347,6 +349,9 @@ class Robot:
                     if self.robot_type == RR_TYPE and self.is_exploring:
                         self.check_if_time_to_getback_to_rendezvous()
             r.sleep()
+
+    def coverage_callback(self, data):
+        self.coverage = data
 
     def evaluate_exploration(self):
         its_time = False
@@ -512,6 +517,8 @@ class Robot:
         move.goal_id = goal_id
         move.goal.target_pose.x = goal[0]
         move.goal.target_pose.y = goal[1]
+        move.goal.target_distance = 0.5  # TODO parameter.
+        move.goal.target_angle = 0.2  # TODO parameter.
         self.moveTo_pub.publish(move)
         self.goal_count += 1
         if self.robot_type == RR_TYPE and direction == BACK_TO_ORIGIN:
@@ -966,14 +973,17 @@ class Robot:
         return rel_angle
 
     def save_all_data(self):
+        self.graph_processor.save_all_data()
         msg = String()
         msg.data = '{}'.format(self.robot_id)
-        self.is_shutdown_caller = True
-        self.shutdown_pub.publish(msg)
+        if not self.is_shutdown_caller:
+            self.is_shutdown_caller = True
+            self.shutdown_pub.publish(msg)
 
     def shutdown_callback(self, data):
         if not self.is_shutdown_caller:
-            rospy.signal_shutdown('Robot {}: Received Shutdown Exploration complete!')
+            self.is_shutdown_caller = True
+            rospy.signal_shutdown('Robot {}: Received Shutdown Exploration complete!'.format(self.robot_id))
 
 
 if __name__ == "__main__":

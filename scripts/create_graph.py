@@ -206,7 +206,7 @@ class Graph:
 
     def save_all_data(self):
         pu.save_data(self.performance_data,
-                     "recurrent_connectivity/performance_{}_{}_{}_{}_{}.pickle".format(self.environment,
+                     "recurrent/performance_{}_{}_{}_{}_{}.pickle".format(self.environment,
                                                                                        self.robot_count, self.run,
                                                                                        self.termination_metric,
                                                                                        self.robot_id))

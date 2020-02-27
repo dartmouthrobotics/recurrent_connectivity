@@ -29,7 +29,7 @@
         <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
         <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
         <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="2" />
+            <param name="robot_id" value="0" />
             <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
         </node>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
@@ -53,13 +53,13 @@
         </node>
         <node pkg="nav2d_navigator" type="navigator" name="navigator">
             <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
-            <param name="robot_id" value="2"/>
+            <param name="robot_id" value="1"/>
         </node>
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
         <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
         <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="2" />
+            <param name="robot_id" value="1" />
             <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
         </node>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
