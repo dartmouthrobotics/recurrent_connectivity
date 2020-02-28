@@ -48,6 +48,9 @@ class Graph:
         self.robot_id = robot_id
         self.performance_data = []
 
+
+
+
     '''
      Pass the message and generate the poses corresponding the explored region
     '''
@@ -61,12 +64,14 @@ class Graph:
         self.origin_pose_x = origin_pose.x
         self.origin_pose_y = origin_pose.y
         grid_values = np.array(map_message.data).reshape((map_height, map_width)).astype(np.float32)
-        for row in range(map_height):
-            for col in range(map_width):
+        num_rows = grid_values.shape[0]
+        num_cols = grid_values.shape[1]
+        for row in range(num_rows):
+            for col in range(num_cols):
                 index = [0] * 2
-                index[INDEX_FOR_X] = row
-                index[INDEX_FOR_Y] = col
-                data_val = grid_values[row, col]
+                index[INDEX_FOR_Y] = num_rows - row - 1
+                index[INDEX_FOR_X] = col
+                data_val = grid_values[num_rows - row - 1, col]
                 self.latest_map[tuple(index)] = data_val
                 if data_val == FREE or data_val == OCCUPIED:
                     self.known_points[tuple(index)] = None

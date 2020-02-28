@@ -38,7 +38,7 @@ BS_TYPE = 1
 RR_TYPE = 2
 FR_TYPE = 3
 
-WIFI_RANGE = 10
+WIFI_RANGE = 20
 BLUETOOTH_RANGE = 5
 MIN_SIGNAL_STRENGTH = -1 * 65.0
 
@@ -86,6 +86,7 @@ class roscbt:
         self.environment = rospy.get_param("/robot_0/0/node0/environment")
         self.run = rospy.get_param("/robot_0/0/node0/run")
         self.termination_metric = rospy.get_param("/robot_0/0/node0/termination_metric")
+        self.comm_range = rospy.get_param("/robot_0/0/node0/comm_range")
 
         # import message types
         for topic in self.topics:
@@ -102,7 +103,6 @@ class roscbt:
         self.coverage = {}
         self.connected_robots = {}
         for i in self.robot_ids:
-            rospy.Subscriber('/robot_{}/map'.format(i), OccupancyGrid, self.map_update_callback)
             exec('self.signal_pub[{0}]=rospy.Publisher("/roscbt/robot_{0}/signal_strength", SignalStrength,'
                  'queue_size=10)'.format(i))
             if str(i) in self.shared_topics:
@@ -132,9 +132,9 @@ class roscbt:
                 i) + "/base_pose_ground_truth', Odometry, self.callback_pos_teammate" + str(i) + ", queue_size = 100)")
 
         # self.listener = tf.TransformListener()
-        self.exploration_data=[]
-        rospy.Subscriber('/shutdown',String,self.shutdown_callback)
-        self.already_shutdown=False
+        self.exploration_data = []
+        rospy.Subscriber('/shutdown', String, self.shutdown_callback)
+        self.already_shutdown = False
         rospy.loginfo("ROSCBT Initialized Successfully!")
 
     def spin(self):
@@ -285,10 +285,6 @@ class roscbt:
             connected = [v for t, v in self.connected_robots.items() if
                          self.lasttime_before_performance_calc < t <= current_time]
 
-            if not explored_area:
-                data['explored_area'] = [-1, -1]
-            else:
-                data['explored_area'] = [np.nanmean(explored_area), np.nanvar(explored_area)]
 
             if not coverage:
                 data['coverage'] = [-1, -1]
@@ -317,14 +313,13 @@ class roscbt:
         finally:
             self.lock.release()
 
-
     '''
       computes euclidean distance between two cartesian coordinates
     '''
 
     def robots_inrange(self, loc1, loc2):
         distance = math.floor(math.sqrt(((loc1[0] - loc2[0]) ** 2) + ((loc1[1] - loc2[1]) ** 2)))
-        return distance, True
+        return distance, distance <= self.comm_range
 
     def get_robot_pose(self, robot_id):
         robot_pose = None
@@ -338,37 +333,6 @@ class roscbt:
         new_p[INDEX_FOR_Y] = round(origin_x + point[INDEX_FOR_X] * resolution, 2)
         new_p[INDEX_FOR_X] = round(origin_y + point[INDEX_FOR_Y] * resolution, 2)
         return tuple(new_p)
-
-    def map_update_callback(self, occ_grid):
-        current_time = rospy.Time.now().secs
-        resolution = occ_grid.info.resolution
-        origin_pos = occ_grid.info.origin.position
-        origin_x = origin_pos.x
-        origin_y = origin_pos.y
-        height = occ_grid.info.height
-        width = occ_grid.info.width
-        grid_values = np.array(occ_grid.data).reshape((height, width)).astype(np.float32)
-
-        for row in range(height):
-            for col in range(width):
-                index = [0] * 2
-                index[INDEX_FOR_X] = col
-                index[INDEX_FOR_Y] = row
-                index = tuple(index)
-                pose = self.pixel2pose(index, origin_x, origin_y, resolution)
-                p = grid_values[row, col]
-                self.pose_desc[pose] = p
-        explored = self.get_explored_area()
-        self.explored_area[current_time] = explored
-
-    def get_explored_area(self):
-        total_area = len(self.pose_desc)
-        all_poses = list(self.pose_desc)
-        explored_area = 0
-        for p in all_poses:
-            if p != -1:
-                explored_area += 1
-        return total_area - explored_area
 
     def D(self, p, q):
         dx = q[0] - p[0]
@@ -407,10 +371,10 @@ class roscbt:
         self.save_all_data()
         rospy.signal_shutdown('ROSCBT: Shutdown command received!')
 
-
     def save_all_data(self):
-            pu.save_data(self.exploration_data, 'recurrent/exploration_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count,self.run,self.termination_metric))
-
+        pu.save_data(self.exploration_data,
+                     'recurrent/exploration_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
+                                                                       self.termination_metric))
 
 
 if __name__ == '__main__':

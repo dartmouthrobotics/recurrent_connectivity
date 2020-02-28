@@ -61,6 +61,8 @@ add_message_files(
    RobotRange.msg
    HomeAlert.msg
    Coverage.msg
+   Frontier.msg
+   Auction.msg
  )
 
 ## Generate services in the 'srv' folder
