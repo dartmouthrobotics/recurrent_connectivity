@@ -31,7 +31,7 @@ Graph class for creating and working with graph.
 
 class Graph:
 
-    def __init__(self, environment, robot_count, map_width, map_height, run, termination_metric, robot_id):
+    def __init__(self, environment, robot_count,run, termination_metric, robot_id):
         self.latest_map = {}
         self.resolution = 0.05
         self.origin_pose_x = 0

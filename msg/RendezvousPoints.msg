@@ -1,5 +1,4 @@
-std_msgs/Header header
-float64[] x
-float64[] y
+recurrent_connectivity/MessageHeader msg_header
+geometry_msgs/Pose[] poses
 float64 exploration_time
 int32 direction

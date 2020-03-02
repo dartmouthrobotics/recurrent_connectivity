@@ -1,4 +1,4 @@
-std_msgs/Header header
+recurrent_connectivity/MessageHeader msg_header
 nav2d_msgs/LocalizedScan[] data
 float64[] base_x
 float64[] base_y

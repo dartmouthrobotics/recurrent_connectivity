@@ -99,7 +99,6 @@ class roscbt:
             self.publisher_map[topic_name] = {}
 
         self.pose_desc = {}
-        self.explored_area = {}
         self.coverage = {}
         self.connected_robots = {}
         for i in self.robot_ids:
@@ -253,7 +252,7 @@ class roscbt:
         self.lock.acquire()
         try:
             current_time = rospy.Time.now().to_sec()
-            data = {'start_time': current_time}
+            data = {'start_time':  rospy.Time.now().to_sec()}
 
             shared_data = []
             comm_ranges = []
@@ -278,8 +277,6 @@ class roscbt:
             else:
                 data['shared_data'] = [np.nanmean(shared_data), np.nanvar(shared_data)]
 
-            explored_area = [v for t, v in self.explored_area.items() if
-                             self.lasttime_before_performance_calc < t <= current_time]
             coverage = [v for t, v in self.coverage.items() if
                         self.lasttime_before_performance_calc < t <= current_time]
             connected = [v for t, v in self.connected_robots.items() if
@@ -307,7 +304,7 @@ class roscbt:
             self.prev_poses = robot_poses
             self.exploration_data.append(data)
             # self.save_data([data], 'recurrent/exploration_{}_{}_{}.pickle'.format(self.environment, self.robot_count,self.run))
-            self.lasttime_before_performance_calc = current_time
+            self.lasttime_before_performance_calc =  rospy.Time.now().to_sec()
         except Exception as e:
             rospy.logerr("getting error: {}".format(e.message))
         finally:

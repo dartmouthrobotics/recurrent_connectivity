@@ -163,13 +163,13 @@ class Robot:
         self.environment = rospy.get_param("~environment")
         self.debug_mode = rospy.get_param("~debug_mode")
         self.termination_metric = rospy.get_param("~termination_metric")
+        self.target_distance = rospy.get_param('~target_distance')
+        self.target_angle = rospy.get_param('~target_angle')
         self.coverage = None
         self.exploration_time = rospy.Time.now().to_sec()
-        map_width = rospy.get_param("~map_width")
-        map_height = rospy.get_param("~map_height")
         run = rospy.get_param("~run")
 
-        self.graph_processor = Graph(self.environment, self.robot_count, map_width, map_height, run,
+        self.graph_processor = Graph(self.environment, self.robot_count, run,
                                      self.termination_metric, self.robot_id)
 
         # Creating publishers
@@ -299,8 +299,10 @@ class Robot:
             rospy.Subscriber('/robot_{}/Explore/status'.format(self.robot_id), GoalStatusArray,
                              self.exploration_callback)
 
-            self.cancel_explore_pub = rospy.Publisher("/robot_{}/Explore/cancel".format(self.robot_id), GoalID,
-                                                      queue_size=10)
+            self.fetch_frontier_points = rospy.ServiceProxy('/robot_{}/frontier_points'.format(self.robot_id),FrontierPoint)
+            self.fetch_rendezvous_points = rospy.ServiceProxy('/robot_{}/rendezvous_points'.format(self.robot_id),RendezvousPoints)
+
+            self.cancel_explore_pub = rospy.Publisher("/robot_{}/Explore/cancel".format(self.robot_id), GoalID,queue_size=10)
 
             # stop service used to trigger a robot to stop moving
             self.move_to_stop = rospy.ServiceProxy('/robot_{}/Stop'.format(self.robot_id), Trigger)
@@ -386,17 +388,16 @@ class Robot:
     ''' This publishes the newly computed rendezvous points for 10 seconds in an interval of 1 second'''
 
     def publish_rendezvous_points(self, rendezvous_poses, receivers, direction=1, total_exploration_time=0):
-        x = [float(v[0]) for v in rendezvous_poses]
-        y = [float(v[1]) for v in rendezvous_poses]
         rv_points = RendezvousPoints()
-        rv_points.x = x
-        rv_points.y = y
-        rv_points.header.frame_id = '{}'.format(self.robot_id)
+        rv_points.poses =rendezvous_poses
+        rv_points.msg_header.header.frame_id = '{}'.format(self.robot_id)
+        rv_points.msg_header.sender_id = str(self.robot_id)
+        rv_points.msg_header.topic = 'rendezvous_points'
         rv_points.exploration_time = total_exploration_time
         rv_points.direction = direction
         for id in receivers:
+            rv_points.msg_header.receiver_id = str(id)
             self.rendezvous_publishers[id].publish(rv_points)
-            sleep(1)  # wait for a second in order to order the RRs
 
     def robots_karto_out_callback(self, data):
         if data.robot_id - 1 == self.robot_id:
@@ -488,8 +489,11 @@ class Robot:
             message_data = self.load_data_for_id(rid)
             if message_data:
                 buffered_data = BufferedData()
-                buffered_data.header.frame_id = '{}'.format(self.robot_id)
-                buffered_data.header.stamp.secs = rospy.Time.now().secs
+                buffered_data.msg_header.header.stamp.secs = rospy.Time.now().secs
+                buffered_data.msg_header.header.frame_id = '{}'.format(self.robot_id)
+                buffered_data.msg_header.sender_id = str(self.robot_id)
+                buffered_data.msg_header.receiver_id = str(rid)
+                buffered_data.msg_header.topic = 'received_data'
                 buffered_data.secs = []
                 buffered_data.data = message_data
                 x = []
@@ -517,8 +521,8 @@ class Robot:
         move.goal_id = goal_id
         move.goal.target_pose.x = goal[0]
         move.goal.target_pose.y = goal[1]
-        move.goal.target_distance = 0.5  # TODO parameter.
-        move.goal.target_angle = 0.2  # TODO parameter.
+        move.goal.target_distance = self.target_distance
+        move.goal.target_angle = self.target_angle
         self.moveTo_pub.publish(move)
         self.goal_count += 1
         if self.robot_type == RR_TYPE and direction == BACK_TO_ORIGIN:
@@ -671,7 +675,7 @@ class Robot:
     '''This callback receives the incoming karto_in data'''
 
     def buffered_data_callback(self, buff_data):
-        sender_id = buff_data.header.frame_id
+        sender_id = buff_data.msg_header.header.frame_id
         if sender_id in self.candidate_robots:
             rospy.logerr("Robot {} received data from {}".format(self.robot_id, sender_id))
             self.process_data(sender_id, buff_data)
@@ -880,6 +884,24 @@ class Robot:
         # pitch = euler[1]
         yaw = euler[2]
         return yaw
+
+    def parse_frontier_response(self, data):
+        frontier_points = []
+        received_poses = data.poses
+        if received_poses:
+            for p in received_poses:
+                yaw = self.get_elevation((p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w))
+                frontier_points.append((p.position.x, p.position.y, yaw))
+        return frontier_points
+
+    def request_and_share_frontiers(self):
+        frontier_point_response = self.fetch_frontier_points(FrontierPointRequest(count=len(self.candidate_robots) + 1))
+        frontier_points = self.parse_frontier_response(frontier_point_response)
+        if frontier_points:
+            self.frontier_points = frontier_points
+
+
+
 
     def generate_transformation_matrices(self):
         map_origin = (0, 0, 0, 1)
