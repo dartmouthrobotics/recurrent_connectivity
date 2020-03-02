@@ -197,7 +197,7 @@ class Robot:
 
         # subscribing to the rendezvous location topic in order to receiver rendezvous location updates -- for RRs & FRs
         if self.robot_type != BS_TYPE:
-            rospy.Subscriber('/roscbt/robot_{}/rendezvous_points'.format(self.robot_id), RendezvousPoints,
+            rospy.Subscriber('/roscbt/robot_{}/rendezvous_points'.format(self.robot_id), RendezvousLocations,
                              self.callback_rendezvous_points)
 
         # subscribe to the robot's scan topic
