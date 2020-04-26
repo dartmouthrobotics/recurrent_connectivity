@@ -623,8 +623,8 @@ class Robot:
                     if self.robot_type == RR_TYPE:
                         rospy.logerr("Robot {}  Arrived at RV point: {}".format(self.robot_id, self.rendezvous_point))
                         self.heading_back = 0
-                        # self.push_messages_to_receiver([self.parent_robot_id])
-                        self.initiate_exploration()
+                        self.push_messages_to_receiver([self.parent_robot_id])
+
                     elif self.robot_type == FR_TYPE:
                         rospy.logerr("Robot {}  Arrived at RV point: {}".format(self.robot_id, self.rendezvous_point))
                         self.push_messages_to_receiver([self.parent_robot_id], is_alert=1)
@@ -690,15 +690,15 @@ class Robot:
                         self.is_initial_rendezvous_sharing = False
                     else:
                         rospy.logerr("Robot {}: No rendzvous points to send...".format(self.robot_id))
-            # else:
-            #     direction = TO_FRONTIER
-            #     self.wait_for_map_update()
-            #     frontier_points = self.graph_processor.get_frontiers()
-            #     if frontier_points:
-            #         self.frontier_points = frontier_points
-            #         self.publish_rendezvous_points(frontier_points, [sender_id], direction=direction)
-            #     else:
-            #         rospy.logerr("Robot {}: No frontier points to send...".format(self.robot_id))
+            else:
+                direction = TO_FRONTIER
+                self.wait_for_map_update()
+                frontier_points = self.graph_processor.get_frontiers()
+                if frontier_points:
+                    self.frontier_points = frontier_points
+                    self.publish_rendezvous_points(frontier_points, [sender_id], direction=direction)
+                else:
+                    rospy.logerr("Robot {}: No frontier points to send...".format(self.robot_id))
 
         elif self.robot_type == RR_TYPE:
             map_points = self.get_map_points(buff_data)

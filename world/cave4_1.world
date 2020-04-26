@@ -64,3 +64,9 @@ pioneer3at
   color "purple"
   pose [40.0 -6.0 0.0 0.0]
 )
+pioneer3at
+(
+  name "robot4"
+  color "purple"
+  pose [40.0 -4.0 0.0 0.0]
+)

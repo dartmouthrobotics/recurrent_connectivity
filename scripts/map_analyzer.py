@@ -97,9 +97,9 @@ class MapAnalyzer:
         allpixels = 0
         for i in range(img.size[0]):
             for j in range(img.size[1]):
-                pixel = pixelMap[i, j][0]
+                pixel = pixelMap[i, j]#[0]
                 allpixels += 1
-                if pixel >= 199:
+                if pixel >= 10:#199:
                     free_point_count += 1
         ratio = free_point_count / float(allpixels)
         return ratio
