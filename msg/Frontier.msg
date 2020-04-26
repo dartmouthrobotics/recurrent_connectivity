@@ -1,2 +1,3 @@
 recurrent_connectivity/MessageHeader msg_header
-geometry_msgs/Pose pose
+recurrent_connectivity/Ridge ridge
+string session_id

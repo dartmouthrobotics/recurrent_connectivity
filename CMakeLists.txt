@@ -58,11 +58,13 @@ add_message_files(
    ChosenPoint.msg
    RobotSignal.msg
    SignalStrength.msg
+   MessageHeader.msg
    RobotRange.msg
-   HomeAlert.msg
    Coverage.msg
    Frontier.msg
    Auction.msg
+   DataSize.msg
+   Ridge.msg
  )
 
 ## Generate services in the 'srv' folder
@@ -70,6 +72,11 @@ add_service_files(
   FILES
   FrontierPoint.srv
   RendezvousPoints.srv
+  SharedData.srv
+  HomeAlert.srv
+  HotSpot.srv
+  SharedPoint.srv
+  SharedFrontier.srv
 #   Service2.srv
 )
 

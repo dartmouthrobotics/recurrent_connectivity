@@ -31,6 +31,7 @@
 
 <node name="roscbt" pkg="recurrent_connectivity" type="roscbt.py" respawn="true">
     <rosparam file="$(find recurrent_connectivity)/param/roscbt_config4.yaml"/>
+    <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
 </node>
 
 </launch>

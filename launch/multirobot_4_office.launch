@@ -27,10 +27,10 @@
             <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
             <param name="robot_id" value="1"/>
         </node>
-          <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="0" />
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
-        </node>
+<!--          <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">-->
+<!--            <param name="robot_id" value="0" />-->
+<!--            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>-->
+<!--        </node>-->
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
         <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
@@ -58,10 +58,10 @@
             <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
             <param name="robot_id" value="2"/>
         </node>
-        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="1" />
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
-        </node>
+<!--        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">-->
+<!--            <param name="robot_id" value="1" />-->
+<!--            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>-->
+<!--        </node>-->
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
         <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
@@ -90,10 +90,10 @@
             <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
             <param name="robot_id" value="2"/>
         </node>
-        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="2" />
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
-        </node>
+<!--        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">-->
+<!--            <param name="robot_id" value="2" />-->
+<!--            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>-->
+<!--        </node>-->
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <node name="GetMap" pkg="nav2d_navigator" type="get_map_client" />
         <node name="SetGoal" pkg="nav2d_navigator" type="set_goal_client" />
@@ -117,10 +117,10 @@
             <param name="robot_frame" value="base_link"/>
             <param name="odometry_frame" value="odom"/>
         </node>
-        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="3" />
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
-        </node>
+<!--        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">-->
+<!--            <param name="robot_id" value="3" />-->
+<!--            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>-->
+<!--        </node>-->
         <node pkg="nav2d_navigator" type="navigator" name="navigator">
             <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
             <param name="robot_id" value="4"/>
@@ -147,10 +147,10 @@
             <param name="robot_frame" value="base_link"/>
             <param name="odometry_frame" value="odom"/>
         </node>
-        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">
-            <param name="robot_id" value="4" />
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
-        </node>
+<!--        <node name="scan_filter" pkg="recurrent_connectivity" type="scan_filter.py">-->
+<!--            <param name="robot_id" value="4" />-->
+<!--            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>-->
+<!--        </node>-->
         <node pkg="nav2d_navigator" type="navigator" name="navigator">
             <rosparam file="$(find recurrent_connectivity)/param/navigator.yaml"/>
             <param name="robot_id" value="5"/>
