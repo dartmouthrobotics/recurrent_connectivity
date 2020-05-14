@@ -40,7 +40,7 @@ floorplan
 pioneer3at
 (
   name "robot1"
-  color "red"
+  color "purple"
   pose [4.0 12.0 0.0 0.0]
 )
 
@@ -48,13 +48,6 @@ pioneer3at
 pioneer3at
 (
   name "robot2"
-  color "blue"
+  color "purple"
   pose [4.0 14.0 0.0 0.0]
-)
-
-pioneer3at
-(
-  name "robot3"
-  color "blue"
-  pose [4.0 10.0 0.0 0.0]
 )
