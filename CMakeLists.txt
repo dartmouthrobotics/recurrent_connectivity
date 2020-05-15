@@ -53,24 +53,32 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
    FILES
-   RendezvousPoints.msg
+   RendezvousLocations.msg
    BufferedData.msg
    ChosenPoint.msg
    RobotSignal.msg
    SignalStrength.msg
+   MessageHeader.msg
    RobotRange.msg
-   HomeAlert.msg
    Coverage.msg
    Frontier.msg
    Auction.msg
+   DataSize.msg
+   Ridge.msg
  )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
+add_service_files(
+  FILES
+  FrontierPoint.srv
+  RendezvousPoints.srv
+  SharedData.srv
+  HomeAlert.srv
+  HotSpot.srv
+  SharedPoint.srv
+  SharedFrontier.srv
 #   Service2.srv
-# )
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(

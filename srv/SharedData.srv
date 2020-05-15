@@ -1,0 +1,4 @@
+recurrent_connectivity/BufferedData req_data
+---
+recurrent_connectivity/BufferedData res_data
+geometry_msgs/Pose[] poses

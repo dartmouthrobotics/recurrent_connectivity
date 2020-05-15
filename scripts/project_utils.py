@@ -2,7 +2,7 @@ import math
 import numpy as np
 import pickle
 from os import path
-
+import rospy
 TOTAL_COVERAGE = 1
 MAXIMUM_EXPLORATION_TIME = 2
 COMMON_COVERAGE = 3
@@ -38,6 +38,10 @@ def save_data(data, file_name):
         pickle.dump(saved_data, fp, protocol=pickle.HIGHEST_PROTOCOL)
         fp.close()
 
+
+def log_msg(robot_id, msg, debug):
+    if debug:
+        rospy.logerr("Robot {}: {}".format(robot_id, msg))
 
 def load_data_from_file(file_name):
     data_dict = []

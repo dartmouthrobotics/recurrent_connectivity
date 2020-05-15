@@ -1,4 +1,4 @@
 recurrent_connectivity/MessageHeader msg_header
 geometry_msgs/Pose[] poses
-float64[] distances
-string session_id
+float64 exploration_time
+int32 direction

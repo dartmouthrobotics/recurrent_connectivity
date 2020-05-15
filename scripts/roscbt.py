@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import pickle
 from os import path
-
+import copy
 import rospy
 import tf
 import math
@@ -10,12 +10,14 @@ import numpy as np
 from threading import Lock
 import json
 from recurrent_connectivity.msg import SignalStrength, RobotSignal
+from recurrent_connectivity.srv import *
+from recurrent_connectivity.msg import DataSize
 from time import sleep
-import sys
 from nav_msgs.msg import OccupancyGrid
-import copy
-import project_utils as pu
+import sys
+from project_utils import save_data
 from std_msgs.msg import String
+from threading import Thread
 
 '''
 ROS communication benchmarking tool (ROSCBT) is a simulator of a communication link between communication devices. 
@@ -38,7 +40,7 @@ BS_TYPE = 1
 RR_TYPE = 2
 FR_TYPE = 3
 
-WIFI_RANGE = 20
+WIFI_RANGE = 10
 BLUETOOTH_RANGE = 5
 MIN_SIGNAL_STRENGTH = -1 * 65.0
 
@@ -60,15 +62,14 @@ class roscbt:
         self.lock = Lock()
         self.communication_model = 1
         self.constant_distance_model = self.compute_constant_distance_ss()
-        # performance datastructures end here
         self.publisher_map = {}
+        self.subsciber_map = {}
         self.signal_pub = {}
         rospy.init_node('roscbt', anonymous=True)
         self.lasttime_before_performance_calc = rospy.Time.now().to_sec()
 
         # we can load the map as an image to determine the location of obstacles in the environment
         self.map_topic = rospy.get_param("map_topic", '')
-
         self.robot_ids = rospy.get_param("/roscbt/robot_ids", [])
         self.robot_ranges = rospy.get_param("/roscbt/robot_ranges", {})
         self.topics = rospy.get_param("/roscbt/topics", [])
@@ -78,15 +79,22 @@ class roscbt:
 
         # processing groundtruth about the map
         map_image_path = rospy.get_param("/roscbt/map_image_path", '')
-
         self.world_scale = rospy.get_param("/roscbt/world_scale", 1)
         self.map_pose = rospy.get_param("/roscbt/map_pose", [])
         self.world_center = rospy.get_param("/roscbt/world_center", [])
-        self.robot_count = rospy.get_param("/robot_0/0/node0/robot_count")
-        self.environment = rospy.get_param("/robot_0/0/node0/environment")
-        self.run = rospy.get_param("/robot_0/0/node0/run")
-        self.termination_metric = rospy.get_param("/robot_0/0/node0/termination_metric")
-        self.comm_range = rospy.get_param("/robot_0/0/node0/comm_range")
+
+        self.termination_metric = rospy.get_param("~termination_metric")
+        self.robot_count = rospy.get_param("~robot_count")
+        self.environment = rospy.get_param("~environment")
+        self.comm_range = rospy.get_param("~comm_range")
+        self.run = rospy.get_param("~run")
+
+        # difference in center of map image and actual simulation
+        self.dx = self.world_center[0] - self.map_pose[0]
+        self.dy = self.world_center[1] - self.map_pose[1]
+        self.exploration_data = []
+        self.sent_messages = []
+        self.received_messages = []
 
         # import message types
         for topic in self.topics:
@@ -97,42 +105,42 @@ class roscbt:
             # rospy.logerr("from {}.msg import {}\n".format(msg_pkg, msg_type))
             # creating publishers data structure
             self.publisher_map[topic_name] = {}
+            self.subsciber_map[topic_name] = {}
 
         self.pose_desc = {}
-        self.explored_area = {}
-        self.coverage = {}
-        self.connected_robots = {}
-        for i in self.robot_ids:
-            exec('self.signal_pub[{0}]=rospy.Publisher("/roscbt/robot_{0}/signal_strength", SignalStrength,'
-                 'queue_size=10)'.format(i))
-            if str(i) in self.shared_topics:
-                topic_map = self.shared_topics[str(i)]
-                for id, topic_dict in topic_map.items():
-                    for k, v in topic_dict.items():
-                        exec("def {0}_{1}_{2}(self, data):self.main_callback({1},{2},data,'{0}')".format(k, id, i))
-                        exec("setattr(roscbt, '{0}_callback{1}_{2}', {0}_{1}_{2})".format(k, id, i))
-                        exec(
-                            "rospy.Subscriber('/robot_{1}/{2}', {3}, self.{2}_callback{0}_{1}, queue_size = 100)".format(
-                                id, i, k, v))
-                        # populating publisher datastructure
-                        exec('pub=rospy.Publisher("/roscbt/robot_{}/{}", {}, queue_size=10)'.format(i, k, v))
-                        if i not in self.publisher_map[k]:
-                            exec('self.publisher_map["{}"]["{}"]=pub'.format(k, i))
+        self.coverage = []
+        self.connected_robots = []
+        rospy.Service("/signal_strength", HotSpot, self.signal_strength_handler)
+        for receiver_id in self.robot_ids:
+            if str(receiver_id) in self.shared_topics:
+                topic_map = self.shared_topics[str(receiver_id)]
+                for sender_id, topic_dict in topic_map.items():
+                    for topic_name, topic_type in topic_dict.items():
+                        if sender_id not in self.subsciber_map[topic_name]:
+                            sub = None
+                            exec("sub=rospy.Subscriber('/roscbt/robot_{0}/{2}', {3}, self.main_callback,queue_size=10)".format(
+                                    sender_id, receiver_id, topic_name, topic_type))
+                            self.subsciber_map[topic_name][sender_id] = sub
+                        if receiver_id not in self.publisher_map[topic_name]:
+                            pub = None
+                            exec('pub=rospy.Publisher("/robot_{}/{}", {}, queue_size=10)'.format(receiver_id, topic_name,
+                                                                                                topic_type))
+                            self.publisher_map[topic_name][receiver_id] = pub
 
         # ======= pose transformations====================
         self.robot_pose = {}
         self.prev_poses = {}
         for i in self.robot_ids:
-            s = "def a_" + str(i) + "(self, data): self.robot_pose[" + str(i) + "] = (data.pose.pose.position.x," \
-                                                                                "data.pose.pose.position.y," \
-                                                                                "data.pose.pose.position.z) "
-            exec(s)
-            exec("setattr(roscbt, 'callback_pos_teammate" + str(i) + "', a_" + str(i) + ")")
-            exec("rospy.Subscriber('/robot_" + str(
-                i) + "/base_pose_ground_truth', Odometry, self.callback_pos_teammate" + str(i) + ", queue_size = 100)")
+            exec("def a_{0}(self, data): self.robot_pose[{0}] = (data.pose.pose.position.x,data.pose.pose.position.y,"
+                 "(data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,"
+                 "data.pose.pose.orientation.w), data.header.stamp.to_sec())".format(i))
+            exec("setattr(roscbt, 'callback_pos_teammate{0}', a_{0})".format(i))
+            exec("rospy.Subscriber('/robot_{0}/base_pose_ground_truth', Odometry, self.callback_pos_teammate{0}, "
+                 "queue_size = 100)".format(i))
 
-        # self.listener = tf.TransformListener()
-        self.exploration_data = []
+            # self.listener = tf.TransformListener()
+        self.shared_data_size = []
+        rospy.Subscriber('/shared_data_size', DataSize, self.shared_data_callback)
         rospy.Subscriber('/shutdown', String, self.shutdown_callback)
         self.already_shutdown = False
         rospy.loginfo("ROSCBT Initialized Successfully!")
@@ -140,67 +148,69 @@ class roscbt:
     def spin(self):
         r = rospy.Rate(0.1)
         while not rospy.is_shutdown():
-            # try:
-            self.share_signal_strength()
+            self.get_coverage()
             self.compute_performance()
             r.sleep()
-            # time.sleep(10)
-        # except Exception as e:
-        #     rospy.logerr('interrupted!: {}'.format(e))
-        #     break
 
-    def read_map_image(self, image_path):
-        im = Image.open(image_path, 'r')
-        pix_val = list(im.getdata())
-        size = im.size
-        pixel_values = {}
-        for index in range(len(pix_val)):
-            i = int(np.floor(index / size[0]))
-            j = index % size[0]
-            pixel_values[(i, j)] = pix_val[index][0]
+    def signal_strength_handler(self, data):
+        r1 = data.robot_id
+        signal_strength = SignalStrength()
+        rsignals = []
+        robot1_pose = self.get_robot_pose(r1)
+        for r2 in self.robot_ids:
+            if r1 != r2:
+                robot2_pose = self.get_robot_pose(r2)
+                if robot1_pose and robot2_pose:
+                    d = math.floor(
+                        math.sqrt(((robot1_pose[0] - robot2_pose[0]) ** 2) + ((robot1_pose[1] - robot2_pose[1]) ** 2)))
+                    ss = self.compute_signal_strength(d)
+                    if ss >= MIN_SIGNAL_STRENGTH:
+                        robot_signal = RobotSignal()
+                        robot_signal.robot_id = int(r2)
+                        robot_signal.rssi = ss
+                        rsignals.append(robot_signal)
+                    signal_strength.header.stamp = rospy.Time.now()
+                    signal_strength.header.frame_id = 'roscbt'
+                    signal_strength.signals = rsignals
+        return HotSpotResponse(hot_spots=signal_strength)
 
-        return size, pixel_values
+    def shared_data_callback(self, data):
+        self.shared_data_size.append({'time': data.header.stamp.to_sec(), 'data_size': data.size})
 
-    ''' Resolving robot ids should be customized by the developer  '''
-
-    def resolve_sender(self, robot_id1, topic, data):
-        sender_id = None
-        if topic == 'received_data':
-            sender_id = data.header.frame_id
-        elif topic == 'rendezvous_points':
-            sender_id = data.header.frame_id
-        if sender_id == str(robot_id1):
-            return sender_id
-
-    def resolve_receiver(self, robot_id2, topic, data):
-        return str(robot_id2)
-
-    def main_callback(self, robot_id1, robot_id2, data, topic):
-
+    def main_callback(self, data):
+        sender_id = data.msg_header.sender_id
+        receiver_id = data.msg_header.receiver_id
+        topic = data.msg_header.topic
+        start_time = rospy.Time.now().to_sec()
+        self.received_messages.append(
+            {'time': start_time, 'message_time': data.msg_header.header.stamp.to_sec(), 'sender_id': sender_id,
+             'receiver_id': receiver_id, 'session_id': data.session_id, 'topic': topic})
         current_time = rospy.Time.now().secs
-        sender_id = self.resolve_sender(robot_id1, topic, data)
-        receiver_id = self.resolve_receiver(robot_id2, topic, data)
-        if sender_id and receiver_id:
-            combn = (sender_id, receiver_id)
-            # handle all message types
-            distance, in_range = self.can_communicate(sender_id, receiver_id)
-            if combn in self.distances:
-                self.distances[combn][current_time] = distance
+        combn = (sender_id, receiver_id)
+        # handle all message types
+        distance, in_range = self.can_communicate(sender_id, receiver_id)
+        if combn in self.distances:
+            self.distances[combn][current_time] = distance
+        else:
+            self.distances[combn] = {current_time: distance}
+        if in_range:
+            self.publisher_map[topic][receiver_id].publish(data)
+            now = rospy.Time.now().secs
+            time_diff = now - start_time
+            self.sent_messages.append(
+                {'time': now, 'message_time': data.msg_header.header.stamp.to_sec(), 'sender_id': sender_id,
+                 'receiver_id': receiver_id, 'session_id': data.session_id, 'time_diff': time_diff,
+                 'topic': topic})
+            data_size = sys.getsizeof(data)
+            self.shared_data_size.append({'time': current_time, 'data_size': data_size})
+            if combn in self.sent_data:
+                self.sent_data[combn][current_time] = data_size
             else:
-                self.distances[combn] = {current_time: distance}
-
-            if in_range:
-                rospy.logerr("Robot {} and {}:  {}".format(receiver_id, sender_id, distance))
-                self.publisher_map[topic][receiver_id].publish(data)
-
-                data_size = sys.getsizeof(data)
-                if combn in self.sent_data:
-                    self.sent_data[combn][current_time] = data_size
-                else:
-                    self.sent_data[combn] = {current_time: data_size}
-            else:
-                rospy.logerr(
-                    "Robot {} and {} are out of range topic {}: {} m".format(receiver_id, sender_id, topic, distance))
+                self.sent_data[combn] = {current_time: data_size}
+            rospy.logerr("Data sent from {} to {} on topic: {}".format(sender_id, receiver_id, topic))
+        else:
+            rospy.logerr(
+                "Robot {} and {} are out of range topic {}: {} m".format(receiver_id, sender_id, topic, distance))
 
     # method to check the constraints for robot communication
     def can_communicate(self, robot_id1, robot_id2):
@@ -209,28 +219,6 @@ class roscbt:
         if not robot1_pose or not robot2_pose:
             return -1, False
         return self.robots_inrange(robot1_pose, robot2_pose)
-
-    def share_signal_strength(self):
-        for r1 in self.robot_ids:
-            signal_strength = SignalStrength()
-            rsignals = []
-            for r2 in self.robot_ids:
-                if r1 != r2:
-                    robot1_pose = self.get_robot_pose(r1)
-                    robot2_pose = self.get_robot_pose(r2)
-                    if robot1_pose and robot2_pose:
-                        d = math.floor(math.sqrt(
-                            ((robot1_pose[0] - robot2_pose[0]) ** 2) + ((robot1_pose[1] - robot2_pose[1]) ** 2)))
-                        ss = self.compute_signal_strength(d)
-                        if ss >= MIN_SIGNAL_STRENGTH:
-                            robot_signal = RobotSignal()
-                            robot_signal.robot_id = int(r2)
-                            robot_signal.rssi = ss
-                            rsignals.append(robot_signal)
-                        signal_strength.header.stamp = rospy.Time.now()
-                        signal_strength.header.frame_id = 'roscbt'
-                        signal_strength.signals = rsignals
-                        self.signal_pub[int(r1)].publish(signal_strength)
 
     def compute_constant_distance_ss(self):
         wifi_freq = 2.4 * math.pow(10, 9)
@@ -253,10 +241,11 @@ class roscbt:
         self.lock.acquire()
         try:
             current_time = rospy.Time.now().to_sec()
-            data = {'start_time': current_time}
+            data = {'start_time': rospy.Time.now().to_sec()}
 
             shared_data = []
             comm_ranges = []
+            distances = []
             for sid in self.robot_ids:
                 for rid in self.robot_ids:
                     if sid != rid:
@@ -278,26 +267,22 @@ class roscbt:
             else:
                 data['shared_data'] = [np.nanmean(shared_data), np.nanvar(shared_data)]
 
-            explored_area = [v for t, v in self.explored_area.items() if
-                             self.lasttime_before_performance_calc < t <= current_time]
-            coverage = [v for t, v in self.coverage.items() if
-                        self.lasttime_before_performance_calc < t <= current_time]
-            connected = [v for t, v in self.connected_robots.items() if
-                         self.lasttime_before_performance_calc < t <= current_time]
+            # coverage = [v for t, v in self.coverage.items() if
+            #             self.lasttime_before_performance_calc < t <= current_time]
+            # connected = [v for t, v in self.connected_robots.items() if
+            #              self.lasttime_before_performance_calc < t <= current_time]
 
-
-            if not coverage:
+            if not self.coverage:
                 data['coverage'] = [-1, -1]
             else:
-                data['coverage'] = [np.nanmean(coverage), np.nanvar(coverage)]
+                data['coverage'] = [np.nanmean(self.coverage), np.nanvar(self.coverage)]
 
-            if not connected:
+            if not self.connected_robots:
                 data['connected'] = [-1, -1]
             else:
-                data['connected'] = [np.nanmean(connected), np.nanvar(connected)]
+                data['connected'] = [np.nanmean(self.connected_robots), np.nanvar(self.connected_robots)]
 
             robot_poses = copy.deepcopy(self.robot_pose)
-            distances = []
             for rid, p in robot_poses.items():
                 d = 0
                 if rid in self.prev_poses:
@@ -306,12 +291,16 @@ class roscbt:
             data['distance'] = np.nansum(distances)
             self.prev_poses = robot_poses
             self.exploration_data.append(data)
-            # self.save_data([data], 'recurrent/exploration_{}_{}_{}.pickle'.format(self.environment, self.robot_count,self.run))
-            self.lasttime_before_performance_calc = current_time
+            self.sent_data.clear()
+            self.distances.clear()
+            del self.coverage[:]
+            del self.connected_robots[:]
+            self.lasttime_before_performance_calc = rospy.Time.now().to_sec()
         except Exception as e:
-            rospy.logerr("getting error: {}".format(e.message))
+            rospy.logerr("getting error: {}".format(e))
         finally:
-            self.lock.release()
+            pass
+        self.lock.release()
 
     '''
       computes euclidean distance between two cartesian coordinates
@@ -328,34 +317,29 @@ class roscbt:
 
         return robot_pose
 
-    def pixel2pose(self, point, origin_x, origin_y, resolution):
-        new_p = [0] * 2
-        new_p[INDEX_FOR_Y] = round(origin_x + point[INDEX_FOR_X] * resolution, 2)
-        new_p[INDEX_FOR_X] = round(origin_y + point[INDEX_FOR_Y] * resolution, 2)
-        return tuple(new_p)
-
     def D(self, p, q):
         dx = q[0] - p[0]
         dy = q[1] - p[1]
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def get_coverage(self):
-        current_time = rospy.Time.now().secs
         distances = []
         connected = {}
         if self.robot_pose:
             for i in self.robot_ids:
                 pose1 = self.get_robot_pose(i)
-                for j in self.robot_ids:
-                    if i != j:
-                        pose2 = self.get_robot_pose(j)
-                        distance, in_range = self.robots_inrange(pose1, pose2)
-                        distances.append(distance)
-                        if in_range:
-                            if i in connected:
-                                connected[i] += 1
-                            else:
-                                connected[i] = 1
+                if pose1:
+                    for j in self.robot_ids:
+                        if i != j:
+                            pose2 = self.get_robot_pose(j)
+                            if pose2:
+                                distance, in_range = self.robots_inrange(pose1, pose2)
+                                distances.append(distance)
+                                if in_range:
+                                    if i in connected:
+                                        connected[i] += 1
+                                    else:
+                                        connected[i] = 1
         if not distances:
             result = [-1, -1]
         else:
@@ -363,18 +347,24 @@ class roscbt:
         if connected:
             key = max(connected, key=connected.get)
             max_connected = connected[key] + 1
-            self.connected_robots[current_time] = max_connected
-        self.coverage[current_time] = result
+            self.connected_robots.append(max_connected)
+        self.coverage.append(result)
         return result
 
-    def shutdown_callback(self, data):
+    def shutdown_callback(self, msg):
         self.save_all_data()
         rospy.signal_shutdown('ROSCBT: Shutdown command received!')
 
     def save_all_data(self):
-        pu.save_data(self.exploration_data,
-                     'recurrent/exploration_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
-                                                                       self.termination_metric))
+        save_data(self.exploration_data,
+                  'recurrent/exploration_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
+                                                                    self.termination_metric))
+        save_data(self.shared_data_size,
+                  'recurrent/roscbt_data_shared_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
+                                                                           self.termination_metric))
+        # save_data(self.coverage,
+        #           'recurrent/coverage_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
+        #                                                          self.termination_metric))
 
 
 if __name__ == '__main__':

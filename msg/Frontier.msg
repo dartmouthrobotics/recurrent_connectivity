@@ -1,2 +1,3 @@
-std_msgs/Header header
-geometry_msgs/Pose pose
+recurrent_connectivity/MessageHeader msg_header
+recurrent_connectivity/Ridge ridge
+string session_id
