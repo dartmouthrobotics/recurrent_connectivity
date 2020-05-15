@@ -33,6 +33,10 @@ SMALL = 0.000000000001
 FONT_SIZE = 16
 MARKER_SIZE = 12
 
+# ids to identify the robot type
+BS_TYPE = 1
+RR_TYPE = 2
+FR_TYPE = 3
 
 class Graph:
     def __init__(self, robot_id=-1):
@@ -66,8 +70,10 @@ class Graph:
         self.prev_ridge = None
         rospy.init_node("graph_node")
         self.robot_id = rospy.get_param("~robot_id")
+        self.robot_type = rospy.get_param("~robot_type")
         self.robot_count = rospy.get_param("~robot_count")
         self.environment = rospy.get_param("~environment")
+        self.bs_pose = rospy.get_param("~bs_pose")
         self.run = rospy.get_param("~run")
         self.debug_mode = rospy.get_param("~debug_mode")
         self.termination_metric = rospy.get_param("~termination_metric")
@@ -102,6 +108,8 @@ class Graph:
                 rospy.logerr('Robot {}: Graph node interrupted!: {}'.format(self.robot_id, e))
 
     def map_callback(self, data):
+        # if self.robot_id == 2:
+        #     rospy.logerr("received map........")
         self.latest_map = data
 
     def is_same_intersection(self, intersec, robot_pose):
@@ -116,10 +124,11 @@ class Graph:
         return is_same
 
     def fetch_rendezvous_points_handler(self, data):
+        rospy.logerr("recieved rv request")
         count = data.count
         rendezvous_points = []
         start = time.time()
-        map_msg = rospy.wait_for_message("/robot_{}/map".format(self.robot_id), OccupancyGrid)
+        map_msg = self.latest_map  # rospy.wait_for_message("/robot_{}/map".format(self.robot_id), OccupancyGrid)
         self.compute_graph(map_msg)
         all_points = list(self.pixel_desc)
         robot_pose = self.get_robot_pose()
@@ -132,6 +141,7 @@ class Graph:
                 pose = Pose()
                 pose.position.x = ap[INDEX_FOR_X]
                 pose.position.y = ap[INDEX_FOR_Y]
+
                 rendezvous_points.append(pose)
             now = time.time()
             t = now - start
@@ -139,7 +149,7 @@ class Graph:
         return RendezvousPointsResponse(poses=rendezvous_points)
 
     def frontier_point_handler(self, request):
-        self.lock.acquire()
+        # self.lock.acquire()
         count = request.count
         map_msg = self.latest_map
         if not map_msg:
@@ -164,11 +174,11 @@ class Graph:
         if self.debug_mode:
             if not self.plot_data_active:
                 self.plot_data(ppoints, is_initial=True)
-        self.lock.release()
+        # self.lock.release()
         return FrontierPointResponse(ridges=selected_leaves)
 
     def intersection_handler(self, data):
-        self.lock.acquire()
+        # self.lock.acquire()
         pose_data = data.pose
         map_msg = self.latest_map
         if not map_msg:
@@ -185,18 +195,18 @@ class Graph:
             self.last_intersection = intersec
             pu.log_msg(self.robot_id, "Intersection: {}".format(intersecs), self.debug_mode)
             result = pu.D(pu.scale_down(intersec[0][1]), pu.scale_down(intersec[1][0]))
-        self.lock.release()
+        # self.lock.release()
         return IntersectionsResponse(result=result)
 
     def fetch_graph_handler(self, data):
-        self.lock.acquire()
+        # self.lock.acquire()
         robot_pose = (data.pose.position.x, data.pose.position.y)
         map_msg = self.latest_map
         if not map_msg:
             map_msg = rospy.wait_for_message("/robot_{}/map".format(self.robot_id), OccupancyGrid)
         self.compute_graph(map_msg)
         edgelist = self.create_edge_list(robot_pose)
-        self.lock.release()
+        # self.lock.release()
         return FetchGraphResponse(edgelist=edgelist)
 
     def create_edge_list(self, robot_pose):
@@ -1058,6 +1068,8 @@ class Graph:
         self.plot_intersection_active = False
 
     def get_robot_pose(self):
+        if self.robot_type == BS_TYPE:
+            return self.bs_pose
         robot_pose = None
         while not robot_pose:
             try:
