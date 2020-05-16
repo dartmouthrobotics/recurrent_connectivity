@@ -49,18 +49,18 @@ pioneer3at
 (
   name "robot2"
   color "purple"
-  pose [36.0 -2.0 0.0 0.0]
+  pose [36.0 -4.0 0.0 0.0]
 )
 pioneer3at
 (
   name "robot3"
   color "purple"
-  pose [34.0 -12.0 0.0 0.0]
+  pose [36.0 -6.0 0.0 0.0]
 )
 
 pioneer3at
 (
   name "robot4"
   color "purple"
-  pose [40.0 -6.0 0.0 0.0]
+  pose [28.0 -4.0 0.0 0.0]
 )

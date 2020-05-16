@@ -41,7 +41,7 @@ pioneer3at
 (
   name "robot1"
   color "purple"
-  pose [36.0 -2.0 0.0 0.0]
+  pose [36.0 -4.0 0.0 0.0]
 )
 
 # Put two robots into the world
@@ -49,7 +49,7 @@ pioneer3at
 (
   name "robot2"
   color "purple"
-  pose [36.0 -4.0 0.0 0.0]
+  pose [36.0 -6.0 0.0 0.0]
 )
 pioneer3at
 (
@@ -62,5 +62,5 @@ pioneer3at
 (
   name "robot4"
   color "purple"
-  pose [36.0 -10.0 0.0 0.0]
+  pose [40.0 -10.0 0.0 0.0]
 )
