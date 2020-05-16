@@ -1,5 +1,7 @@
 #!/usr/bin/python
-
+# import matplotlib as mpl
+# mpl.use('Agg')
+# mpl.rcParams['agg.path.chunksize'] = 10000
 from PIL import Image
 import numpy as np
 import rospy
@@ -7,6 +9,7 @@ from project_utils import INDEX_FOR_X, INDEX_FOR_Y, pixel2pose, FREE, OCCUPIED, 
 from nav_msgs.msg import OccupancyGrid
 from recurrent_connectivity.msg import Coverage
 from std_msgs.msg import String
+import matplotlib.pyplot as plt
 
 
 class MapAnalyzer:
@@ -19,7 +22,6 @@ class MapAnalyzer:
         self.debug_mode = rospy.get_param("~debug_mode")
         self.termination_metric = rospy.get_param("~termination_metric")
         self.environment = rospy.get_param("~environment")
-        self.bs_pose = rospy.get_param('~bs_pose')
         self.total_free_area = 0
         self.free_area_ratio = 0
         self.map_resolution = 0
@@ -27,6 +29,7 @@ class MapAnalyzer:
         self.all_explored_points = set()
         self.all_maps = {}
         self.robot_maps = {}
+        self.pixel_desc = {}
         for i in range(self.robot_count):
             exec("def a_{0}(self, data):self.robot_maps[{0}] = data".format(i))
             exec("setattr(MapAnalyzer, 'callback_map_teammate{0}', a_{0})".format(i))
@@ -56,14 +59,11 @@ class MapAnalyzer:
                 origin_y = origin_pos.y - (origin_pos.y - origin_y0)
                 cov_set, unexplored_set = self.get_map_description(map, rid, origin_x, origin_y)
                 if rid not in self.all_maps:
-                    rospy.logerr('Results for {}'.format(rid))
                     self.all_maps[rid] = cov_set
                 else:
                     self.all_maps[rid] = self.all_maps[rid].union(cov_set)
-                    rospy.logerr('already exists Results for {}, size: {}, received size: {}'.format(rid,len(self.all_maps[rid]),len(cov_set)))
                 common_points.append(self.all_maps[rid])
                 self.all_explored_points = self.all_explored_points.union(cov_set)
-                rospy.logerr('Explored points: {}'.format(len(self.all_explored_points)))
             common_area = set.intersection(*common_points)
             common_area_size = len(common_area) * 0.25
             explored_area = len(self.all_explored_points) * 0.25  # scale of the map in rviz
@@ -101,16 +101,15 @@ class MapAnalyzer:
                 index = tuple(index)
                 pose = pixel2pose(index, origin_x, origin_y, self.map_resolution)
                 pose = self.round_point(pose)
-                p = grid_values[num_rows - row - 1, col]
-                if p == FREE:
+                if pose in self.pixel_desc:
                     explored_poses.add(pose)
                 else:
                     unexplored_poses.add(pose)
         return explored_poses, unexplored_poses
 
     def round_point(self, p):
-        xc = round(p[INDEX_FOR_X], 2)
-        yc = round(p[INDEX_FOR_Y], 2)
+        xc = round(p[INDEX_FOR_X], 1)
+        yc = round(p[INDEX_FOR_Y], 1)
         new_p = [0.0] * 2
         new_p[INDEX_FOR_X] = xc
         new_p[INDEX_FOR_Y] = yc
@@ -123,22 +122,29 @@ class MapAnalyzer:
         pixelMap = im.load()
         free_points = 0
         allpixels = 0
-        for i in range(im.size[0]):
-            for j in range(im.size[1]):
+        width = im.size[0]
+        height = im.size[1]
+        for i in range(width):
+            for j in range(height):
+                index = [0.0] * 2
+                index[INDEX_FOR_X] = i * 0.1
+                index[INDEX_FOR_Y] = (height - j) * 0.1
+                pose = self.round_point(index)
                 pixel = pixelMap[i, j]
                 allpixels += 1
                 if isinstance(pixel, int):
                     if pixel > 0:
                         free_points += 1
+                        self.pixel_desc[pose] = None
                 else:
                     pixel = pixelMap[i, j][0]
                     if pixel > 0:
                         free_points += 1
-        free_area = float(free_points)
+                        self.pixel_desc[pose] = None
+        free_area = float(len(self.pixel_desc))
         self.free_area_ratio = free_points / float(allpixels)
         self.total_free_area = free_area
-        rospy.logerr(
-            "Free pixel ratio: {}, All points: {}, {}".format(self.free_area_ratio, self.total_free_area, im.size))
+        rospy.logerr("Free pixel ratio: {}, All points: {}, {}".format(self.free_area_ratio, self.total_free_area, im.size))
 
     def shutdown_callback(self, msg):
         rospy.signal_shutdown('MapAnalyzer: Shutdown command received!')
@@ -146,7 +152,7 @@ class MapAnalyzer:
     def save_all_data(self):
         save_data(self.all_coverage_data,
                   'recurrent/coverage_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
-                                                                 self.termination_metric))
+                                                                  self.termination_metric))
 
 
 if __name__ == '__main__':

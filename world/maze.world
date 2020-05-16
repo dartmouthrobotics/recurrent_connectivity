@@ -31,16 +31,16 @@ window
 # Load an environment bitmap
 floorplan
 (
-  name "tutorial"
-  bitmap "basic.png"
-  size [ 30.0 21.5 2.0 ]
-  pose [  14.85  12.55 0.0 0.0 ]
+    name "tutorial"
+    bitmap "basic.png"
+    size [ 30.0 21.5 2.0 ]
+    pose [  14.85  12.55 0.0 0.0 ]
 )
 
 pioneer3at
 (
   name "robot1"
-  color "purple"
+  color "red"
   pose [4.0 12.0 0.0 0.0]
 )
 
@@ -48,6 +48,6 @@ pioneer3at
 pioneer3at
 (
   name "robot2"
-  color "purple"
-  pose [4.0 14.0 0.0 0.0]
+  color "blue"
+  pose [4.0 10.0 0.0 0.0]
 )
