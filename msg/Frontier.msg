@@ -1,3 +1,0 @@
-recurrent_connectivity/MessageHeader msg_header
-recurrent_connectivity/Ridge ridge
-string session_id

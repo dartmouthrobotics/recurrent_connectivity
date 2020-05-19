@@ -3,21 +3,15 @@ import pickle
 from os import path
 import copy
 import rospy
-import tf
 import math
-from PIL import Image
 import numpy as np
 from threading import Lock
-import json
-from recurrent_connectivity.msg import SignalStrength, RobotSignal
-from recurrent_connectivity.srv import *
-from recurrent_connectivity.msg import DataSize
-from time import sleep
+from gvgexploration.msg import SignalStrength, RobotSignal
+from gvgexploration.srv import *
+from gvgexploration.msg import DataSize
 from nav_msgs.msg import OccupancyGrid
-import sys
 from project_utils import save_data
 from std_msgs.msg import String
-from threading import Thread
 
 '''
 ROS communication benchmarking tool (ROSCBT) is a simulator of a communication link between communication devices. 
@@ -103,7 +97,6 @@ class roscbt:
             msg_type = topic["message_type"]
             topic_name = topic["name"]
             exec("from {}.msg import {}\n".format(msg_pkg, msg_type))
-            # rospy.logerr("from {}.msg import {}\n".format(msg_pkg, msg_type))
             # creating publishers data structure
             self.publisher_map[topic_name] = {}
             self.subsciber_map[topic_name] = {}
@@ -204,7 +197,7 @@ class roscbt:
                 {'time': now, 'message_time': data.msg_header.header.stamp.to_sec(), 'sender_id': sender_id,
                  'receiver_id': receiver_id, 'time_diff': time_diff,
                  'topic': topic})
-            data_size = self.get_data_size(data)  # sys.getsizeof(data)
+            data_size = self.get_data_size(topic,data)  # sys.getsizeof(data)
             self.shared_data_size.append({'time': current_time, 'data_size': data_size})
             if combn in self.sent_data:
                 self.sent_data[combn][current_time] = data_size
@@ -216,7 +209,7 @@ class roscbt:
                 "Robot {} and {} are out of range topic {}: {} m".format(receiver_id, sender_id, topic, distance))
 
     def get_data_size(self, topic, data):
-        if topic == 'received_data':
+        if topic == 'initial_data':
             return len(data.data)
         return 1.0
 
@@ -287,6 +280,9 @@ class roscbt:
         return distance, distance <= self.comm_range
 
     def get_robot_pose(self, robot_id):
+        if robot_id == len(self.robot_ids)-1:
+            rospy.logerr("Robot pose")
+            return self.bs_pose
         robot_pose = None
         if int(robot_id) in self.robot_pose:
             robot_pose = self.robot_pose[int(robot_id)]

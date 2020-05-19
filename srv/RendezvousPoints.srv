@@ -1,3 +1,0 @@
-int32 count
----
-geometry_msgs/Pose[] poses

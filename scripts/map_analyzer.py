@@ -6,9 +6,8 @@ import numpy as np
 import rospy
 from project_utils import INDEX_FOR_X, INDEX_FOR_Y, pixel2pose, FREE, OCCUPIED, save_data, get_point
 from nav_msgs.msg import OccupancyGrid
-from recurrent_connectivity.msg import Coverage
+from gvgexploration.msg import Coverage
 from std_msgs.msg import String
-import matplotlib.pyplot as plt
 
 
 class MapAnalyzer:

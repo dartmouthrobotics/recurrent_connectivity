@@ -10,15 +10,12 @@ from nav_msgs.msg import *
 from sensor_msgs.msg import *
 from geometry_msgs.msg import *
 import math
-from create_graph import Graph
-from recurrent_connectivity.msg import *
-from random import randint
+from gvgexploration.msg import *
 from nav2d_navigator.msg import MoveToPosition2DActionGoal, MoveToPosition2DActionResult, ExploreActionGoal, \
     ExploreActionResult
 from actionlib_msgs.msg import GoalStatusArray, GoalID
-from recurrent_connectivity.srv import *
+from gvgexploration.srv import *
 from std_srvs.srv import Trigger
-import sys
 from time import sleep
 from threading import Thread, Lock
 import copy
@@ -163,7 +160,7 @@ class Robot:
         self.coverage = None
         self.arrived_points = 0
         self.explore_id = None
-        self.exploration_complete=False
+        self.exploration_complete = False
 
         self.robot_count = rospy.get_param("~robot_count")
         self.environment = rospy.get_param("~environment")
@@ -209,7 +206,6 @@ class Robot:
             self.allocation_srv_map[ri] = alloc_point_clt
 
         if robot_type == RR_TYPE:
-            rospy.logerr("Robot id: {}".format(self.robot_id))
             self.parent_robot_id = self.base_stations[0]
 
             # =========   Navigation and exploration =======
@@ -238,7 +234,7 @@ class Robot:
             self.chose_point_pub = rospy.Publisher("/chosen_point", ChosenPoint, queue_size=10)
             rospy.Subscriber("/chosen_point", ChosenPoint, self.chosen_point_callback)
 
-        rospy.Subscriber("/robot_{}/map".format(self.robot_id), OccupancyGrid, self.map_callback,queue_size=1)
+        rospy.Subscriber("/robot_{}/map".format(self.robot_id), OccupancyGrid, self.map_callback, queue_size=1)
         rospy.Subscriber('/karto_out', LocalizedScan, self.robots_karto_out_callback, queue_size=10)
         for i in self.candidate_robots + [self.robot_id]:
             s = "def a_" + str(i) + "(self, data): self.robot_poses[" + str(i) + "] = (data.pose.pose.position.x," \
@@ -369,7 +365,7 @@ class Robot:
     def exploration_result_callback(self, data):
         if data.status.status == SUCCEEDED:
             pu.log_msg(self.robot_id, "Received exploration result: {}".format(data.status.status), self.debug_mode)
-            self.exploration_complete=True
+            self.exploration_complete = True
             self.move_back_to_base_station()
 
     def get_close_devices(self):
@@ -690,7 +686,7 @@ class Robot:
         buffered_data.msg_header.header.frame_id = '{}'.format(self.robot_id)
         buffered_data.msg_header.sender_id = str(self.robot_id)
         buffered_data.msg_header.receiver_id = str(rid)
-        buffered_data.msg_header.topic = 'received_data'
+        buffered_data.msg_header.topic = 'initial_data'
         buffered_data.secs = []
         buffered_data.data = message_data
         buffered_data.base_map = self.base_map
@@ -713,8 +709,12 @@ class Robot:
                     if self.initial_data_count == len(self.candidate_robots):
                         self.is_initial_rendezvous_sharing = False
                         rospy.logerr("calling rv service")
+                        pose_v = self.get_robot_pose()
+                        p = Pose()
+                        p.position.x = pose_v[pu.INDEX_FOR_X]
+                        p.position.y = pose_v[pu.INDEX_FOR_Y]
                         rendezvous_points = self.fetch_rendezvous_points(
-                            RendezvousPointsRequest(count=len(self.candidate_robots)))
+                            RendezvousPointsRequest(count=len(self.candidate_robots), pose=p))
                         rv_poses = rendezvous_points.poses
                         if rv_poses:
                             self.publish_rendezvous_points(rv_poses, self.candidate_robots, direction=direction)

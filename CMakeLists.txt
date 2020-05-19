@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav2d_msgs
   nav_msgs
   sensor_msgs
+  gvgexploration
   message_generation
 )
 
@@ -51,34 +52,34 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-   FILES
-   RendezvousLocations.msg
-   BufferedData.msg
-   ChosenPoint.msg
-   RobotSignal.msg
-   SignalStrength.msg
-   MessageHeader.msg
-   RobotRange.msg
-   Coverage.msg
-   Frontier.msg
-   Auction.msg
-   DataSize.msg
-   Ridge.msg
- )
+# add_message_files(
+#    FILES
+#    RendezvousLocations.msg
+#    BufferedData.msg
+#    ChosenPoint.msg
+#    RobotSignal.msg
+#    SignalStrength.msg
+#    MessageHeader.msg
+#    RobotRange.msg
+#    Coverage.msg
+#    Frontier.msg
+#    Auction.msg
+#    DataSize.msg
+#    Ridge.msg
+#  )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  FrontierPoint.srv
-  RendezvousPoints.srv
-  SharedData.srv
-  HomeAlert.srv
-  HotSpot.srv
-  SharedPoint.srv
-  SharedFrontier.srv
-#   Service2.srv
-)
+# add_service_files(
+#   FILES
+#   FrontierPoint.srv
+#   RendezvousPoints.srv
+#   SharedData.srv
+#   HomeAlert.srv
+#   HotSpot.srv
+#   SharedPoint.srv
+#   SharedFrontier.srv
+# #   Service2.srv
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -95,6 +96,7 @@ generate_messages(
    nav_msgs
    sensor_msgs
  )
+
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -127,7 +129,7 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES finalproject
+ LIBRARIES gvgexploration
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )

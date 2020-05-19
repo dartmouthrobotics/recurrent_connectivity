@@ -10,7 +10,6 @@
     <arg name="run" default="0"/>
     <group ns="$(arg robot_name)">
         <node pkg="recurrent_connectivity" type="robot.py" name="node$(arg robot_name)" >
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
             <param name="robot_id" value="$(arg robot_name)"/>
             <param name="robot_type" value="$(arg robot_type)"/>
             <param name="base_stations" value="$(arg base_stations)"/>
@@ -19,8 +18,10 @@
             <param name="map_width" value="$(arg map_width)"/>
             <param name="map_height" value="$(arg map_height)"/>
             <param name="run" value="$(arg run)"/>
+            <rosparam file="$(find gvgexploration)/param/gvg_config.yaml"/>
         </node>
-        <node pkg="recurrent_connectivity" type="graph.py" name="node$(arg robot_name)_graph_processor" >
+
+        <node pkg="gvgexploration" type="graph.py" name="node$(arg robot_name)_graph_processor" >
             <param name="robot_id" value="$(arg robot_name)"/>
             <param name="robot_type" value="$(arg robot_type)"/>
             <param name="base_stations" value="$(arg base_stations)"/>
@@ -29,7 +30,7 @@
             <param name="map_width" value="$(arg map_width)"/>
             <param name="map_height" value="$(arg map_height)"/>
             <param name="run" value="$(arg run)"/>
-            <rosparam file="$(find recurrent_connectivity)/param/gvg_config.yaml"/>
+            <rosparam file="$(find gvgexploration)/param/gvg_config.yaml"/>
         </node>
     </group>
 </launch>
