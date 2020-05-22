@@ -190,7 +190,7 @@ class Robot:
                                                           RendezvousPoints)
 
         self.karto_pub = rospy.Publisher('/robot_{}/karto_in'.format(self.robot_id), LocalizedScan, queue_size=1000)
-        rospy.logerr("Robot {}: All candidates: {}".format(self.robot_id,self.candidate_robots))
+        rospy.logerr("Robot {}: All candidates: {}".format(self.robot_id, self.candidate_robots))
         for ri in self.candidate_robots:
             pub = rospy.Publisher("/robot_{}/initial_data".format(ri), BufferedData, queue_size=1000)
             pub1 = rospy.Publisher("/robot_{}/rendezvous_points".format(ri), RendezvousLocations, queue_size=10)
@@ -347,7 +347,7 @@ class Robot:
         points = []
         for p in poses:
             point = (p.position.x, p.position.y)
-            point=pu.scale_down(point)
+            point = pu.scale_down(point)
             points.append(point)
         return points
 
@@ -673,8 +673,11 @@ class Robot:
         pu.log_msg(self.robot_id, "Processed received data..", self.debug_mode)
         return SharedDataResponse(poses=[], res_data=buff_data)
 
-    def create_buff_data(self, rid, is_alert=0):
+    def create_buff_data(self, rid, is_alert=0, is_home_alert=False):
         message_data = self.load_data_for_id(rid)
+        if is_home_alert:
+            message_data = message_data + self.load_data_for_id(self.parent_robot_id)
+
         buffered_data = BufferedData()
         buffered_data.msg_header.header.stamp.secs = rospy.Time.now().secs
         buffered_data.msg_header.header.frame_id = '{}'.format(self.robot_id)
@@ -730,7 +733,8 @@ class Robot:
 
     def home_alert_callback(self, data):
         pu.log_msg(self.robot_id, 'Home Alert received from {}'.format(data.robot_id), self.debug_mode)
-        buff_data = self.create_buff_data(data.robot_id)
+        buff_data = self.create_buff_data(data.robot_id,is_home_alert=1)
+        self.delete_data_for_id(data.robot_id)
         self.delete_data_for_id(self.parent_robot_id)
         return HomeAlertResponse(res_data=buff_data)
 
