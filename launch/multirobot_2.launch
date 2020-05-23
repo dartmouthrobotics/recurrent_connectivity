@@ -6,8 +6,8 @@
     </node>
 
     <node name="R0_MapAlign" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /map /robot_0/map 100"/>
-    <node name="R1_MapAlign" pkg="tf" type="static_transform_publisher" args="50 0 0 0 0 0 /map /robot_1/map 100"/>
-    <node name="R2_MapAlign" pkg="tf" type="static_transform_publisher" args="100 0 0 0 0 0 /map /robot_2/map 100"/>
+    <node name="R1_MapAlign" pkg="tf" type="static_transform_publisher" args="80 0 0 0 0 0 /map /robot_1/map 100"/>
+    <node name="R2_MapAlign" pkg="tf" type="static_transform_publisher" args="160 0 0 0 0 0 /map /robot_2/map 100"/>
 
     <group ns="robot_0">
         <param name="robot_id" value="1" />
@@ -69,7 +69,6 @@
 
     <group ns="robot_2">
         <param name="robot_id" value="3" />
-        <rosparam command="load" file="$(find gvgexploration)/param/ros.yaml" subst_value="true"/>
         <param name="tf_prefix" type="string" value="robot_2"/>
         <rosparam command="load" file="$(find gvgexploration)/param/ros.yaml" subst_value="true"/>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
@@ -77,6 +76,10 @@
             <arg name="robot_type" value="1" />
             <arg name="relay_robots" value="0,1" />
         </include>
+        <node name="scan_filter" pkg="gvgexploration" type="scan_filter.py">
+            <param name="robot_id" value="2" />
+            <rosparam command="load"  file="$(find gvgexploration)/param/gvg_config.yaml" subst_value="true"/>
+        </node>
         <node pkg="nav2d_karto" name="Mapper" type="mapper">
             <remap from="karto_out" to="/karto_out" />
             <rosparam command="load" file="$(find gvgexploration)/param/mapper.yaml" subst_value="true"/>
