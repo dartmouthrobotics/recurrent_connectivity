@@ -138,7 +138,8 @@ class roscbt:
             # self.listener = tf.TransformListener()
         self.shared_data_size = []
         rospy.Subscriber('/shared_data_size', DataSize, self.shared_data_callback)
-        rospy.Subscriber('/shutdown', String, self.shutdown_callback)
+        rospy.on_shutdown(self.save_all_data)
+        # rospy.Subscriber('/shutdown', String, self.shutdown_callback)
         self.already_shutdown = False
         rospy.loginfo("ROSCBT Initialized Successfully!")
 
@@ -327,10 +328,10 @@ class roscbt:
 
     def save_all_data(self):
         save_data(self.exploration_data,
-                  'recurrent/exploration_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count, self.run,
+                  '{}/exploration_{}_{}_{}_{}.pickle'.format(self.method,self.environment, self.robot_count, self.run,
                                                                     self.termination_metric))
         save_data(self.shared_data_size,
-                  'recurrent/roscbt_data_shared_{}_{}_{}_{}.pickle'.format(self.environment, self.robot_count,
+                  '{}/roscbt_data_shared_{}_{}_{}_{}.pickle'.format(self.method,self.environment, self.robot_count,
                                                                            self.run, self.termination_metric))
 
 
