@@ -79,6 +79,7 @@ class roscbt:
 
         self.termination_metric = rospy.get_param("~termination_metric")
         self.comm_range = rospy.get_param("~comm_range")
+        self.method = rospy.get_param("~method")
         self.robot_count = rospy.get_param("~robot_count")
         self.environment = rospy.get_param("~environment")
         self.bs_pose = rospy.get_param("~bs_pose")
@@ -280,9 +281,6 @@ class roscbt:
         return distance, distance <= self.comm_range
 
     def get_robot_pose(self, robot_id):
-        if robot_id == len(self.robot_ids)-1:
-            rospy.logerr("Robot pose")
-            return self.bs_pose
         robot_pose = None
         if int(robot_id) in self.robot_pose:
             robot_pose = self.robot_pose[int(robot_id)]
