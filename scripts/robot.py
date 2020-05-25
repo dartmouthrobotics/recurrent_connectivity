@@ -169,6 +169,7 @@ class Robot:
         self.max_coverage = rospy.get_param("~max_coverage")
         self.max_common_coverage = rospy.get_param("~max_common_coverage")
         self.bs_pose = rospy.get_param("~bs_pose")
+        self.graph_scale = rospy.get_param("~graph_scale")
         self.max_target_info_ratio = rospy.get_param("~max_target_info_ratio")
         self.exploration_time = rospy.Time.now().to_sec()
         self.candidate_robots = self.relay_robots + self.base_stations
@@ -346,7 +347,7 @@ class Robot:
         points = []
         for p in poses:
             point = (p.position.x, p.position.y)
-            point = pu.scale_down(point)
+            point = pu.scale_down(point,self.graph_scale)
             points.append(point)
         return points
 
@@ -736,7 +737,7 @@ class Robot:
         # self.process_data(received_data)
         thread = Thread(target=self.process_data, args=(received_data,))
         thread.start()
-        sender_id=str(data.robot_id)
+        sender_id = str(data.robot_id)
         buff_data = self.create_buff_data(sender_id, is_home_alert=1)
         self.delete_data_for_id(sender_id)
         self.delete_data_for_id(self.parent_robot_id)
@@ -918,7 +919,7 @@ class Robot:
         new_point = [0.0] * 2
         new_point[pu.INDEX_FOR_X] = self.frontier_ridge.nodes[1].position.x
         new_point[pu.INDEX_FOR_Y] = self.frontier_ridge.nodes[1].position.y
-        new_point = pu.scale_down(new_point)
+        new_point = pu.scale_down(new_point, self.graph_scale)
         self.frontier_point = new_point
         robot_pose = self.get_robot_pose()
         self.frontier_data.append(
@@ -939,7 +940,7 @@ class Robot:
         received_points = []
         distances = []
         robot_pose = self.get_robot_pose()
-        robot_pose = pu.scale_up(robot_pose)
+        robot_pose = pu.scale_up(robot_pose,self.graph_scale)
         for p in poses:
             received_points.append(p)
             point = (p.position.x, p.position.y,
@@ -956,7 +957,6 @@ class Robot:
         auction.distances = distances
         auction.session_id = data.session_id
         return SharedPointResponse(auction_accepted=1, res_data=auction)
-
 
     def add_to_file(self, rid, data):
         self.lock.acquire()
