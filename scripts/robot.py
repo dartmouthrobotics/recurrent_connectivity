@@ -150,7 +150,6 @@ class Robot:
         self.shared_data_srv_map = {}
         self.shared_point_srv_map = {}
         self.allocation_srv_map = {}
-        self.alerted_robots = []
         self.exploration_started = False
         self.is_shutdown_caller = False
         self.coverage = None
@@ -158,10 +157,12 @@ class Robot:
         self.explore_id = None
         self.exploration_complete = False
         self.still_processing = False
+        self.base_station_started = False
         self.robot_count = rospy.get_param("~robot_count")
         self.environment = rospy.get_param("~environment")
         self.debug_mode = rospy.get_param("~debug_mode")
         self.termination_metric = rospy.get_param("~termination_metric")
+        self.share_limit = rospy.get_param('~data_share_threshold')
         self.target_distance = rospy.get_param('~target_distance')
         self.target_angle = rospy.get_param('~target_angle')
         self.run = rospy.get_param("~run")
@@ -171,6 +172,7 @@ class Robot:
         self.bs_pose = rospy.get_param("~bs_pose")
         self.graph_scale = rospy.get_param("~graph_scale")
         self.max_target_info_ratio = rospy.get_param("~max_target_info_ratio")
+        self.conn_manager = {}
         self.exploration_time = rospy.Time.now().to_sec()
         self.candidate_robots = self.relay_robots + self.base_stations
 
@@ -198,6 +200,7 @@ class Robot:
             received_data_clt = rospy.ServiceProxy("/robot_{}/shared_data".format(ri), SharedData)
             action_points_clt = rospy.ServiceProxy("/robot_{}/auction_points".format(ri), SharedPoint)
             alloc_point_clt = rospy.ServiceProxy("/robot_{}/allocated_point".format(ri), SharedFrontier)
+            self.conn_manager[ri] = rospy.Time.now().to_sec()
 
             self.publisher_map[ri] = pub
             self.rendezvous_publishers[ri] = pub1
@@ -257,11 +260,22 @@ class Robot:
     def spin(self):
         r = rospy.Rate(0.05)
         while not rospy.is_shutdown():
-            self.update_base_points()
-            pu.log_msg(self.robot_id, "Is exploring: {}".format(self.is_exploring), self.debug_mode)
-            if self.is_exploring:
-                self.check_if_time_to_getback_to_rendezvous()
+            try:
+                self.update_base_points()
+                pu.log_msg(self.robot_id, "Is exploring: {}".format(self.is_exploring), self.debug_mode)
+                if self.is_exploring:
+                    self.check_if_time_to_getback_to_rendezvous()
+            except Exception as e:
+                pu.log_msg(self.robot_id, "Got Error: {}".format(e), self.debug_mode)
             r.sleep()
+
+    def is_time_to_share(self, rid):
+        now = rospy.Time.now().to_sec()
+        diff = now - self.conn_manager[rid]
+        return diff > self.share_limit
+
+    def update_share_time(self, rid):
+        self.conn_manager[rid] = rospy.Time.now().to_sec()
 
     def coverage_callback(self, data):
         self.coverage = data
@@ -304,7 +318,7 @@ class Robot:
     def robots_karto_out_callback(self, data):
         if data.robot_id - 1 == self.robot_id:
             for rid in self.candidate_robots:
-                self.add_to_file(rid, data)
+                self.add_to_file(rid, [data])
             if self.robot_type == RR_TYPE and self.is_initial_rendezvous_sharing:
                 self.is_initial_rendezvous_sharing = False
                 self.push_messages_to_receiver([self.parent_robot_id])
@@ -347,7 +361,7 @@ class Robot:
         points = []
         for p in poses:
             point = (p.position.x, p.position.y)
-            point = pu.scale_down(point,self.graph_scale)
+            point = pu.scale_down(point, self.graph_scale)
             points.append(point)
         return points
 
@@ -406,22 +420,22 @@ class Robot:
             pu.log_msg(self.robot_id, "Target ratio: {}".format(self.target_info_ratio), self.debug_mode)
 
     def process_alert_data(self, received_data):
-        for data in received_data:
+        for sender_id, data in received_data.items():
             received_buff_data = data.res_data
-            self.process_data(received_buff_data)
-            # thread = Thread(target=self.process_data, args=(received_buff_data,))
-            # thread.start()
+            sender_id = received_buff_data.msg_header.header.frame_id
             heading_back = received_buff_data.heading_back
             if heading_back:
                 if self.heading_back:
                     self.heading_back = 0  # then you've shared your data and you're all set. continue with exploration
                     self.base_points = copy.deepcopy(self.robot_points)
+            thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
+            thread.start()
             pu.log_msg(self.robot_id, "Processed alert data", self.debug_mode)
 
     def process_parent_data(self, data, sent_data=[]):
         received_buff_data = data.res_data
-        # self.process_data(received_buff_data)
-        thread = Thread(target=self.process_data, args=(received_buff_data,))
+        sender_id = received_buff_data.msg_header.header.frame_id
+        thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
         thread.start()
         self.base_points = copy.deepcopy(self.robot_points)  # received_buff_data.base_map
         data_size = self.get_data_size(received_buff_data.data) + self.get_data_size(sent_data)
@@ -546,25 +560,30 @@ class Robot:
                                 self.share_data_with_parent()
                         else:
                             if goal_status.goal_id.id == id_4 and close_devices:
-                                received_data = []
+                                received_data = {}
                                 data_size = 0
                                 for rid in close_devices:
-                                    if rid not in self.alerted_robots:
-                                        self.alerted_robots.append(rid)
+                                    receiver_id = str(rid)
+                                    if self.is_time_to_share(receiver_id):
+                                        self.update_share_time(receiver_id)
                                         buff_data = self.create_buff_data(rid)
-                                        home_alert_resp = self.home_alert_map[rid](
-                                            HomeAlertRequest(robot_id=self.robot_id, home_alert=1, req_data=buff_data))
-                                        received_data.append(home_alert_resp)
+                                        try:
+                                            home_alert_resp = self.home_alert_map[rid](
+                                                HomeAlertRequest(robot_id=self.robot_id, home_alert=1,
+                                                                 req_data=buff_data))
+                                            received_data[receiver_id] = home_alert_resp.res_data
+                                            data_size += self.get_data_size(home_alert_resp.res_data.data)
+                                            self.delete_data_for_id(rid)
+                                        except Exception as e:
+                                            pu.log_msg(self.robot_id, "Error sending data to: {}".format(receiver_id),
+                                                       self.debug_mode)
                                         data_size += self.get_data_size(buff_data.data)
-                                        data_size += self.get_data_size(home_alert_resp.res_data.data)
-                                        self.delete_data_for_id(rid)
                                 if data_size:
                                     self.report_shared_data(data_size)
-
-                                self.process_alert_data(received_data)
-                                if not self.heading_back:
-                                    self.move_to_stop()
-                                    self.initiate_exploration()
+                                    self.process_alert_data(received_data)
+                                    if not self.heading_back:
+                                        self.move_to_stop()
+                                        self.initiate_exploration()
 
                 elif goal_status.goal_id.id == id_0:
                     if goal_status.status == ACTIVE:
@@ -643,7 +662,6 @@ class Robot:
             self.is_exploring = True
             self.heading_back = 0
             self.robot_state = ACTIVE_STATE
-            self.alerted_robots = []
         else:
             pu.log_msg(self.robot_id, "Failed to start exploration...", self.debug_mode)
 
@@ -654,22 +672,24 @@ class Robot:
         pu.log_msg(self.robot_id, "received a response", self.debug_mode)
         self.delete_data_for_id(self.parent_robot_id)
 
-    def process_data(self, buff_data):
+    def process_data(self, sender_id, buff_data):
+        # self.lock.acquire()
         data_vals = buff_data.data
         for scan in data_vals:
-            sid = str(scan.robot_id - 1)
             self.karto_pub.publish(scan)
-            for rid in self.candidate_robots:
-                if rid != sid:
-                    self.add_to_file(rid, scan)
+        for rid in self.candidate_robots:
+            if rid != sender_id:
+                self.add_to_file(rid, data_vals)
+        # self.lock.release()
 
     def shared_data_handler(self, data):
         pu.log_msg(self.robot_id, "Received request from robot..", self.debug_mode)
         received_buff_data = data.req_data
         sender_id = received_buff_data.msg_header.header.frame_id
-        thread = Thread(target=self.process_data, args=(received_buff_data,))
-        thread.start()
+        self.update_share_time(sender_id)
         buff_data = self.create_buff_data(sender_id, is_alert=0)
+        thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
+        thread.start()
         self.delete_data_for_id(sender_id)
         pu.log_msg(self.robot_id, "Processed received data..", self.debug_mode)
         return SharedDataResponse(poses=[], res_data=buff_data)
@@ -699,15 +719,18 @@ class Robot:
     def buffered_data_callback(self, buff_data):
         sender_id = buff_data.msg_header.header.frame_id
         if sender_id in self.candidate_robots:
-            pu.log_msg(self.robot_id, "Received data from {}".format(sender_id), self.debug_mode)
-            self.process_data(buff_data)
+            self.process_data(sender_id, buff_data)
+            pu.log_msg(self.robot_id, "Received data from: {}".format(sender_id), self.debug_mode)
             if self.robot_type == BS_TYPE:
                 self.push_messages_to_receiver([sender_id])
                 direction = TO_RENDEZVOUS
-                if self.is_initial_rendezvous_sharing:
+                if not self.base_station_started:
                     self.initial_data_count += 1
+                    pu.log_msg(self.robot_id, "Initial data count {}".format(self.initial_data_count), self.debug_mode)
                     if self.initial_data_count == len(self.candidate_robots):
+                        self.base_station_started = True
                         self.is_initial_rendezvous_sharing = False
+                        pu.log_msg(self.robot_id, "Received data all the data", self.debug_mode)
                         pose_v = self.get_robot_pose()
                         p = Pose()
                         p.position.x = pose_v[pu.INDEX_FOR_X]
@@ -734,13 +757,11 @@ class Robot:
     def home_alert_callback(self, data):
         pu.log_msg(self.robot_id, 'Home Alert received from {}'.format(data.robot_id), self.debug_mode)
         received_data = data.req_data
-        # self.process_data(received_data)
-        thread = Thread(target=self.process_data, args=(received_data,))
+        sender_id = received_data.msg_header.header.frame_id
+        thread = Thread(target=self.process_data, args=(sender_id, received_data,))
         thread.start()
-        sender_id = str(data.robot_id)
         buff_data = self.create_buff_data(sender_id, is_home_alert=1)
         self.delete_data_for_id(sender_id)
-        self.delete_data_for_id(self.parent_robot_id)
         return HomeAlertResponse(res_data=buff_data)
 
     def chosen_point_callback(self, data):
@@ -940,7 +961,7 @@ class Robot:
         received_points = []
         distances = []
         robot_pose = self.get_robot_pose()
-        robot_pose = pu.scale_up(robot_pose,self.graph_scale)
+        robot_pose = pu.scale_up(robot_pose, self.graph_scale)
         for p in poses:
             received_points.append(p)
             point = (p.position.x, p.position.y,
@@ -959,12 +980,12 @@ class Robot:
         return SharedPointResponse(auction_accepted=1, res_data=auction)
 
     def add_to_file(self, rid, data):
-        self.lock.acquire()
+        # self.lock.acquire()
         if rid in self.karto_messages:
-            self.karto_messages[rid].append(data)
+            self.karto_messages[rid] += data
         else:
-            self.karto_messages[rid] = [data]
-        self.lock.release()
+            self.karto_messages[rid] = data
+        # self.lock.release()
         return True
 
     def load_data_for_id(self, rid):
