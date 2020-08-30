@@ -116,7 +116,7 @@ class Robot:
         self.retry_attempts = 0
         self.move_attempt = 0
         self.saved_messages = 0
-        self.signal_strength = []
+        self.signal_strength = {}
         self.total_collected_size = 0
         self.navigation_plan = None
         self.waiting_for_plan = False
@@ -142,7 +142,6 @@ class Robot:
         self.new_info = 0
         self.target_info_ratio = 0
         self.heading_back = 0
-        self.robot_poses = {}
         self.trans_matrices = {}
         self.inverse_trans_matrices = {}
         self.robot_points = set()
@@ -172,6 +171,9 @@ class Robot:
         self.bs_pose = rospy.get_param("~bs_pose")
         self.graph_scale = rospy.get_param("~graph_scale")
         self.max_target_info_ratio = rospy.get_param("~max_target_info_ratio")
+        self.mac_id = rospy.get_param("~mac_id")
+        self.comm_range=rospy.get_param("~comm_range")
+
         self.conn_manager = {}
         self.exploration_time = rospy.Time.now().to_sec()
         self.candidate_robots = self.relay_robots + self.base_stations
@@ -185,13 +187,17 @@ class Robot:
         rospy.Subscriber('/robot_{}/initial_data'.format(self.robot_id), BufferedData, self.buffered_data_callback,
                          queue_size=100)
         self.data_size_pub = rospy.Publisher('/shared_data_size', DataSize, queue_size=10)
-        self.signal_strength_srv = rospy.ServiceProxy("/signal_strength".format(self.robot_id), HotSpot)
+
+        rospy.Subscriber('/rosbot{}/wifi_chatter'.format(self.robot_id), WifiStrength, self.wifi_strength_callback)
+        rospy.Subscriber('/master_discovery/linkstats'.format(self.robot_id), LinkStatesStamped, self.discovery_callback)
+
         self.fetch_frontier_points = rospy.ServiceProxy('/robot_{}/frontier_points'.format(self.robot_id),
                                                         FrontierPoint)
         self.fetch_rendezvous_points = rospy.ServiceProxy('/robot_{}/rendezvous'.format(self.robot_id),
                                                           RendezvousPoints)
 
-        self.karto_pub = rospy.Publisher('/robot_{}/karto_in'.format(self.robot_id), LocalizedScan, queue_size=1000)
+        self.karto_pub = rospy.Publisher('/karto_in'.format(self.robot_id), LocalizedScan, queue_size=1000)
+
 
         for ri in self.candidate_robots:
             pub = rospy.Publisher("/robot_{}/initial_data".format(ri), BufferedData, queue_size=1000)
@@ -212,24 +218,24 @@ class Robot:
         if robot_type == RR_TYPE:
             self.parent_robot_id = self.base_stations[0]
             # =========   Navigation and exploration =======
-            rospy.Subscriber("/robot_{}/MoveTo/status".format(self.robot_id), GoalStatusArray,
+            rospy.Subscriber("/MoveTo/status".format(self.robot_id), GoalStatusArray,
                              self.move_status_callback)
-            rospy.Subscriber("/robot_{}/MoveTo/result".format(self.robot_id), MoveToPosition2DActionResult,
+            rospy.Subscriber("/MoveTo/result".format(self.robot_id), MoveToPosition2DActionResult,
                              self.move_result_callback)
-            self.moveTo_pub = rospy.Publisher("/robot_{}/MoveTo/goal".format(self.robot_id), MoveToPosition2DActionGoal,
+            self.moveTo_pub = rospy.Publisher("/MoveTo/goal".format(self.robot_id), MoveToPosition2DActionGoal,
                                               queue_size=10)
-            self.start_exploration = rospy.ServiceProxy('/robot_{}/StartExploration'.format(self.robot_id), Trigger)
-            rospy.Subscriber('/robot_{}/Explore/status'.format(self.robot_id), GoalStatusArray,
+            self.start_exploration = rospy.ServiceProxy('/StartExploration'.format(self.robot_id), Trigger)
+            rospy.Subscriber('/Explore/status'.format(self.robot_id), GoalStatusArray,
                              self.exploration_callback)
-            self.cancel_explore_pub = rospy.Publisher("/robot_{}/Explore/cancel".format(self.robot_id), GoalID,
+            self.cancel_explore_pub = rospy.Publisher("/Explore/cancel".format(self.robot_id), GoalID,
                                                       queue_size=10)
-            self.start_exploration_pub = rospy.Publisher("/robot_{}/Explore/goal".format(self.robot_id),
+            self.start_exploration_pub = rospy.Publisher("/Explore/goal".format(self.robot_id),
                                                          ExploreActionGoal, queue_size=10)
-            rospy.Subscriber('/robot_{}/Explore/result'.format(self.robot_id), ExploreActionResult,
+            rospy.Subscriber('/Explore/result'.format(self.robot_id), ExploreActionResult,
                              self.exploration_result_callback)
-            self.move_to_stop = rospy.ServiceProxy('/robot_{}/Stop'.format(self.robot_id), Trigger)
-            self.pose_publisher = rospy.Publisher("/robot_{}/cmd_vel".format(self.robot_id), Twist, queue_size=1)
-            rospy.Subscriber("/robot_{}/pose".format(self.robot_id), Pose, callback=self.pose_callback)
+            self.move_to_stop = rospy.ServiceProxy('/Stop'.format(self.robot_id), Trigger)
+            self.pose_publisher = rospy.Publisher("/cmd_vel".format(self.robot_id), Twist, queue_size=1)
+            rospy.Subscriber("/pose".format(self.robot_id), Pose, callback=self.pose_callback)
             # ============ Ends Here ======================
 
             rospy.Subscriber('/robot_{}/rendezvous_points'.format(self.robot_id), RendezvousLocations,
@@ -239,14 +245,6 @@ class Robot:
 
         self.explored_region = rospy.ServiceProxy("/robot_{}/explored_region".format(self.robot_id), ExploredRegion)
         rospy.Subscriber('/karto_out', LocalizedScan, self.robots_karto_out_callback, queue_size=10)
-        for i in self.candidate_robots + [self.robot_id]:
-            s = "def a_" + str(i) + "(self, data): self.robot_poses[" + str(i) + "] = (data.pose.pose.position.x," \
-                                                                                 "data.pose.pose.position.y," \
-                                                                                 "(data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,data.pose.pose.orientation.w)) "
-            exec(s)
-            exec("setattr(Robot, 'callback_pos_teammate" + str(i) + "', a_" + str(i) + ")")
-            exec("rospy.Subscriber('/robot_" + str(
-                i) + "/base_pose_ground_truth', Odometry, self.callback_pos_teammate" + str(i) + ", queue_size = 100)")
 
         self.shutdown_pub = rospy.Publisher("/shutdown".format(self.robot_id), String, queue_size=10)
         rospy.Subscriber('/shutdown', String, self.shutdown_callback)
@@ -268,6 +266,16 @@ class Robot:
             except Exception as e:
                 pu.log_msg(self.robot_id, "Got Error: {}".format(e), self.debug_mode)
             r.sleep()
+
+    def wifi_strength_callback(self, data):
+        src_mac=data.src
+        dst_mac=data.dst
+        if src_mac in self.mac_id and dst_mac in self.mac_id and self.mac_id[dst_mac]==self.robot_id:
+            self.signal_strength[self.mac_id[src_mac]]=data.signal
+
+    def discovery_callback(self, data):
+        for d in data.links:
+            self.master_links.add(d.destination)
 
     def is_time_to_share(self, rid):
         now = rospy.Time.now().to_sec()
@@ -378,18 +386,26 @@ class Robot:
             self.exploration_complete = True
             self.move_back_to_base_station()
 
+    # def get_close_devices(self):
+    #     robots = []
+    #     devices = []
+    #     try:
+    #         ss_data = self.signal_strength_srv(HotSpotRequest(robot_id=str(self.robot_id)))
+    #         data = ss_data.hot_spots
+    #         signals = data.signals
+    #         for rs in signals:
+    #             robots.append([rs.robot_id, rs.rssi])
+    #             devices.append(str(rs.robot_id))
+    #     except:
+    #         pass
+    #     return set(devices)
+
     def get_close_devices(self):
-        robots = []
         devices = []
-        try:
-            ss_data = self.signal_strength_srv(HotSpotRequest(robot_id=str(self.robot_id)))
-            data = ss_data.hot_spots
-            signals = data.signals
-            for rs in signals:
-                robots.append([rs.robot_id, rs.rssi])
-                devices.append(str(rs.robot_id))
-        except:
-            pass
+        hotspots=list(self.signal_strength)
+        for h in hotspots:
+            if self.signal_strength[h] >=self.comm_range:
+                devices.append(str(h))
         return set(devices)
 
     def callback_rendezvous_points(self, data):
@@ -1028,11 +1044,11 @@ class Robot:
         robot_pose = None
         while not robot_pose:
             try:
-                self.listener.waitForTransform("robot_{}/map".format(self.robot_id),
-                                               "robot_{}/base_link".format(self.robot_id), rospy.Time(),
+                self.listener.waitForTransform("/map".format(self.robot_id),
+                                               "base_link".format(self.robot_id), rospy.Time(),
                                                rospy.Duration(4.0))
-                (robot_loc_val, rot) = self.listener.lookupTransform("robot_{}/map".format(self.robot_id),
-                                                                     "robot_{}/base_link".format(self.robot_id),
+                (robot_loc_val, rot) = self.listener.lookupTransform("/map".format(self.robot_id),
+                                                                     "/base_link".format(self.robot_id),
                                                                      rospy.Time(0))
                 robot_pose = (math.floor(robot_loc_val[0]), math.floor(robot_loc_val[1]))
                 sleep(1)
