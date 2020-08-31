@@ -26,6 +26,8 @@ import os
 from os.path import exists, getsize
 from std_msgs.msg import String
 import project_utils as pu
+from wifi_node.msg import WifiStrength
+from multimaster_msgs_fkie.msg import LinkStatesStamped
 
 INF = 1000000000000
 NEG_INF = -1000000000000
@@ -235,7 +237,7 @@ class Robot:
                              self.exploration_result_callback)
             self.move_to_stop = rospy.ServiceProxy('/Stop'.format(self.robot_id), Trigger)
             self.pose_publisher = rospy.Publisher("/cmd_vel".format(self.robot_id), Twist, queue_size=1)
-            rospy.Subscriber("/pose".format(self.robot_id), Pose, callback=self.pose_callback)
+            rospy.Subscriber("/pose".format(self.robot_id), PoseStamped, callback=self.pose_callback)
             # ============ Ends Here ======================
 
             rospy.Subscriber('/robot_{}/rendezvous_points'.format(self.robot_id), RendezvousLocations,
@@ -842,7 +844,9 @@ class Robot:
         return new_p
 
     def pose_callback(self, msg):
-        pose = (msg.x, msg.y, msg.theta)
+        quaternion = (msg.pose.orientation.x,msg.pose.orientation.y,msg.pose.orientation.z,msg.pose.orientation.w)
+        theta=self.get_elevation(quaternion)
+        pose = (msg.pose.position.x, msg.pose.position.y, theta)
         self.robot_pose = pose
 
     def cancel_exploration(self):
@@ -1045,7 +1049,7 @@ class Robot:
         while not robot_pose:
             try:
                 self.listener.waitForTransform("/map".format(self.robot_id),
-                                               "base_link".format(self.robot_id), rospy.Time(),
+                                               "/base_link".format(self.robot_id), rospy.Time(),
                                                rospy.Duration(4.0))
                 (robot_loc_val, rot) = self.listener.lookupTransform("/map".format(self.robot_id),
                                                                      "/base_link".format(self.robot_id),
