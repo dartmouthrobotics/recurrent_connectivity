@@ -175,7 +175,7 @@ class Robot:
         self.max_target_info_ratio = rospy.get_param("~max_target_info_ratio")
         self.mac_id = rospy.get_param("~mac_id")
         self.comm_range=rospy.get_param("~comm_range")
-
+        self.master_links = set()
         self.conn_manager = {}
         self.exploration_time = rospy.Time.now().to_sec()
         self.candidate_robots = self.relay_robots + self.base_stations
