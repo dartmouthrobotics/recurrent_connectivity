@@ -105,6 +105,7 @@ class Robot:
         self.initial_data_count = 0
         self.is_exploring = False
         self.robot_stopped = False
+        self.is_initial_data_sharing = True
         self.is_initial_frontier = True
         self.exploration_id = None
         self.frontier_points = []
@@ -174,7 +175,7 @@ class Robot:
         self.graph_scale = rospy.get_param("~graph_scale")
         self.max_target_info_ratio = rospy.get_param("~max_target_info_ratio")
         self.mac_id = rospy.get_param("~mac_id")
-        self.comm_range=rospy.get_param("~comm_range")
+        self.comm_range = rospy.get_param("~comm_range")
         self.master_links = set()
         self.conn_manager = {}
         self.exploration_time = rospy.Time.now().to_sec()
@@ -191,7 +192,8 @@ class Robot:
         self.data_size_pub = rospy.Publisher('/shared_data_size', DataSize, queue_size=10)
 
         rospy.Subscriber('/rosbot{}/wifi_chatter'.format(self.robot_id), WifiStrength, self.wifi_strength_callback)
-        rospy.Subscriber('/master_discovery/linkstats'.format(self.robot_id), LinkStatesStamped, self.discovery_callback)
+        rospy.Subscriber('/master_discovery/linkstats'.format(self.robot_id), LinkStatesStamped,
+                         self.discovery_callback)
 
         self.fetch_frontier_points = rospy.ServiceProxy('/robot_{}/frontier_points'.format(self.robot_id),
                                                         FrontierPoint)
@@ -199,7 +201,6 @@ class Robot:
                                                           RendezvousPoints)
 
         self.karto_pub = rospy.Publisher('/karto_in'.format(self.robot_id), LocalizedScan, queue_size=1000)
-
 
         for ri in self.candidate_robots:
             pub = rospy.Publisher("/robot_{}/initial_data".format(ri), BufferedData, queue_size=1000)
@@ -261,19 +262,26 @@ class Robot:
         r = rospy.Rate(0.05)
         while not rospy.is_shutdown():
             try:
-                self.update_base_points()
-                pu.log_msg(self.robot_id, "Is exploring: {}".format(self.is_exploring), self.debug_mode)
-                if self.is_exploring:
-                    self.check_if_time_to_getback_to_rendezvous()
+                if self.is_initial_data_sharing:
+                    if len(self.master_links) == len(self.candidate_robots) + 1:
+                        sleep(5)
+                        rospy.logerr("Sending initial data to all robots...")
+                        self.push_messages_to_receiver(self.candidate_robots)
+                        self.is_initial_data_sharing = False
+                else:
+                    self.update_base_points()
+                    pu.log_msg(self.robot_id, "Is exploring: {}".format(self.is_exploring), self.debug_mode)
+                    if self.is_exploring:
+                        self.check_if_time_to_getback_to_rendezvous()
             except Exception as e:
                 pu.log_msg(self.robot_id, "Got Error: {}".format(e), self.debug_mode)
             r.sleep()
 
     def wifi_strength_callback(self, data):
-        src_mac=data.src
-        dst_mac=data.dst
-        if src_mac in self.mac_id and dst_mac in self.mac_id and self.mac_id[dst_mac]==self.robot_id:
-            self.signal_strength[self.mac_id[src_mac]]=data.signal
+        src_mac = data.src
+        dst_mac = data.dst
+        if src_mac in self.mac_id and dst_mac in self.mac_id and self.mac_id[dst_mac] == self.robot_id:
+            self.signal_strength[self.mac_id[src_mac]] = data.signal
 
     def discovery_callback(self, data):
         for d in data.links:
@@ -329,9 +337,9 @@ class Robot:
         if data.robot_id - 1 == self.robot_id:
             for rid in self.candidate_robots:
                 self.add_to_file(rid, [data])
-            if self.robot_type == RR_TYPE and self.is_initial_rendezvous_sharing:
-                self.is_initial_rendezvous_sharing = False
-                self.push_messages_to_receiver([self.parent_robot_id])
+            # if self.robot_type == RR_TYPE and self.is_initial_rendezvous_sharing:
+            #     self.is_initial_rendezvous_sharing = False
+            #     self.push_messages_to_receiver([self.parent_robot_id])
 
     def start_exploration_action(self, new_point, direction=0):
         if direction == TO_RENDEZVOUS:
@@ -404,9 +412,9 @@ class Robot:
 
     def get_close_devices(self):
         devices = []
-        hotspots=list(self.signal_strength)
+        hotspots = list(self.signal_strength)
         for h in hotspots:
-            if self.signal_strength[h] >=self.comm_range:
+            if self.signal_strength[h] >= self.comm_range:
                 devices.append(str(h))
         return set(devices)
 
@@ -844,8 +852,8 @@ class Robot:
         return new_p
 
     def pose_callback(self, msg):
-        quaternion = (msg.pose.orientation.x,msg.pose.orientation.y,msg.pose.orientation.z,msg.pose.orientation.w)
-        theta=self.get_elevation(quaternion)
+        quaternion = (msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w)
+        theta = self.get_elevation(quaternion)
         pose = (msg.pose.position.x, msg.pose.position.y, theta)
         self.robot_pose = pose
 
