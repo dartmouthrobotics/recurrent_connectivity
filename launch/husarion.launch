@@ -1,6 +1,6 @@
 <launch>
 <arg name="robot_id"/>
-<arg name="base_station"/>
+<arg name="base_stations" default=""/>
 <arg name="robot_type"/>
 <arg name="relay_robots" default="[]"/>
 <node name="BaseAlign" pkg="tf" type="static_transform_publisher" args="0 0 0 3.14 0 0 /base_link /laser 10"/>
@@ -21,7 +21,7 @@
     <include file="$(find recurrent_connectivity)/launch/robot.launch">
         <arg name="robot_name" value="$(arg robot_id)" />
         <arg name="robot_type" value="$(arg robot_type)" />
-        <arg name="base_stations" value="$(arg base_station)" />
+        <arg name="base_stations" value="$(arg base_stations)" />
         <arg name="relay_robots" value="$(arg relay_robots)" />
     </include>
 </group>

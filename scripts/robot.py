@@ -201,7 +201,6 @@ class Robot:
                                                           RendezvousPoints)
 
         self.karto_pub = rospy.Publisher('/karto_in'.format(self.robot_id), LocalizedScan, queue_size=1000)
-
         for ri in self.candidate_robots:
             pub = rospy.Publisher("/robot_{}/initial_data".format(ri), BufferedData, queue_size=1000)
             pub1 = rospy.Publisher("/robot_{}/rendezvous_points".format(ri), RendezvousLocations, queue_size=10)
