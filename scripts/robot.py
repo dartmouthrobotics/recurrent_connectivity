@@ -250,7 +250,7 @@ class Robot:
 
         self.shutdown_pub = rospy.Publisher("/shutdown".format(self.robot_id), String, queue_size=10)
         rospy.Subscriber('/shutdown', String, self.shutdown_callback)
-        rospy.Subscriber('/coverage'.format(self.robot_id), Coverage, self.coverage_callback)
+        rospy.Subscriber('/robot_{}/coverage'.format(self.robot_id), Coverage, self.coverage_callback)
         rospy.on_shutdown(self.save_all_data)
         # ======= pose transformations====================
         self.listener = tf.TransformListener()
