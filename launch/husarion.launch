@@ -1,12 +1,8 @@
 <launch>
 <arg name="robot_id"/>
-<<<<<<< Updated upstream
 <arg name="base_stations" default=""/>
-=======
-<arg name="base_station" default="[]"/>
->>>>>>> Stashed changes
 <arg name="robot_type"/>
-<arg name="relay_robots" default="[]"/>
+<arg name="relay_robots" default=""/>
 <node name="BaseAlign" pkg="tf" type="static_transform_publisher" args="0 0 0 3.14 0 0 /base_link /laser 10"/>
 <rosparam file="$(find gvgexploration)/param/ros.yaml"/>
 <node pkg="nav2d_operator" type="operator" name="operator" output="screen">
