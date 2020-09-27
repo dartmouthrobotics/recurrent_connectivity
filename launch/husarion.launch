@@ -40,4 +40,5 @@
         <rosparam param="ignore_nodes"> ['/*msgs_conversion*','/*rosbot_ekf*','/*rplidarNode*','/*serial_node*','/*Mapper*','/*GetMap*','/*OdomAlign*','/BaseAlign','/MapAlign','/*SetGoal*','/*navigator*','/*operator*'] </rosparam>
     </node>
 </group>
+    <node pkg="rosbag" type="record" name="recurrent_rosbag" output="screen" args="--all"/>
 </launch>
