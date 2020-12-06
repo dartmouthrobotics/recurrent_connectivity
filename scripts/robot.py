@@ -500,7 +500,7 @@ class Robot:
         goal_id = GoalID()
         goal_id.id = id_val
         move.goal_id = goal_id
-        move.goal.header.frame_id='map'
+        move.goal.header.frame_id= '/robot_{}/map'.format(self.robot_id)
         move.goal.target_pose.x = goal[0]
         move.goal.target_pose.y = goal[1]
         move.goal.target_distance = self.target_distance
