@@ -303,6 +303,7 @@ class Graph:
         if self.robot_type == 1:
             self.get_map = rospy.ServiceProxy('/robot_0/static_map'.format(self.robot_id), GetMap)
         rospy.Subscriber('/shutdown', String, self.shutdown_callback)
+        self.last_frontier_points=[]
         self.listener = tf.TransformListener()
         self.last_graph_update_time = rospy.Time.now().to_sec()
         rospy.loginfo('Robot {}: Successfully created graph node'.format(self.robot_id))
@@ -364,7 +365,9 @@ class Graph:
                 pose.position.x = ap[INDEX_FOR_X]
                 pose.position.y = ap[INDEX_FOR_Y]
                 rendezvous_points.append(pose)
-        return RendezvousPointsResponse(poses=rendezvous_points)
+        if rendezvous_points:
+            self.last_frontier_points=rendezvous_points
+        return RendezvousPointsResponse(poses=self.last_frontier_points)
 
     def enough_delay(self):
         return rospy.Time.now().to_sec() - self.last_graph_update_time > 30  # updated last 20 secs

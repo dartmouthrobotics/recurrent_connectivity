@@ -429,17 +429,17 @@ class Robot:
                 if self.heading_back:
                     self.heading_back = 0  # then you've shared your data and you're all set. continue with exploration
                     self.base_points = copy.deepcopy(self.robot_points)
-            self.process_data(sender_id,received_buff_data)
-            # thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
-            # thread.start()
+            # self.process_data(sender_id,received_buff_data)
+            thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
+            thread.start()
             pu.log_msg(self.robot_id, "Processed alert data", self.debug_mode)
 
     def process_parent_data(self, data, sent_data=[]):
         received_buff_data = data.res_data
         sender_id = received_buff_data.msg_header.header.frame_id
-        self.process_data(sender_id, received_buff_data)
-        # thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
-        # thread.start()
+        # self.process_data(sender_id, received_buff_data)
+        thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
+        thread.start()
         self.base_points = copy.deepcopy(self.robot_points)  # received_buff_data.base_map
         data_size = self.get_data_size(received_buff_data.data) + self.get_data_size(sent_data)
         self.report_shared_data(data_size)
@@ -448,8 +448,14 @@ class Robot:
         if self.exploration_complete:
             pu.log_msg(self.robot_id, "Exploration complete!!", self.debug_mode)
         else:
-            response = self.fetch_frontier_points(FrontierPointRequest(count=len(self.candidate_robots) + 1))
-            poses = response.frontiers
+            poses=[]
+            while len(poses)==0:
+                try:
+                    response = self.fetch_frontier_points(FrontierPointRequest(count=len(self.candidate_robots) + 1))
+                    poses = response.frontiers
+                except:
+                      pu.log_msg(self.robot_id,"Error on fetching frontiers",1-self.debug_mode)
+                      sleep(1)
             # poses = [r.nodes[1] for r in ridges]
             received_points = self.parse_rendezvous_locations(poses)
             self.move_attempt = 0
@@ -989,10 +995,10 @@ class Robot:
 
     def delete_data_for_id(self, rid):
         # sleep(2)
-        # self.lock.acquire()
+        self.lock.acquire()
         if rid in self.karto_messages:
             del self.karto_messages[rid]
-        # self.lock.release()
+        self.lock.release()
         return True
 
     def get_angle(self, a, b):
