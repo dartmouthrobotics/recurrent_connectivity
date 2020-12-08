@@ -31,6 +31,7 @@ from scipy.ndimage import minimum_filter
 from tf import TransformListener
 from nav_msgs.srv import GetMap
 from geometry_msgs.msg import Pose, PointStamped
+from bresenham import bresenham
 
 INF = 100000
 SCALE = 10
@@ -146,7 +147,7 @@ class Grid:
 
         x1, y1 = current_cell.astype(int)
         x2, y2 = end_cell.astype(int)
-
+        # rospy.logerr("FP cell: {}, CP cell: {}".format((x1,y1,),(x2,y2)))
         for p in list(bresenham(x1, y1, x2, y2)):
             if self.is_unknown(*p):
                 return True
@@ -323,18 +324,47 @@ class Graph:
             pu.log_msg(self.robot_id, "Map didn't update", self.debug_mode)
             return
 
+    def transform_pose(self, pose,fpoint):
+        theta = pu.theta(pose,fpoint)
+        x= pose[INDEX_FOR_X] + self.lidar_scan_radius* math.cos(theta)
+        y= pose[INDEX_FOR_Y] + self.lidar_scan_radius*math.sin(theta)
+        next_pose=[0.0]*2
+        next_pose[INDEX_FOR_X]=x
+        next_pose[INDEX_FOR_Y]=y
+        return next_pose
+
+
     def frontier_point_handler(self, request):
         count = request.count
         frontier_points = []
         self.generate_graph()
         free_points = list(self.latest_map.get_explored_region())
-        if free_points:
-            hull, boundary_points = graham_scan(free_points, count, False)
+        orig_pose =self.get_robot_pose()
+        potential_fps=[]
+        for ap in free_points:
+            npoint=self.transform_pose(orig_pose,ap)
+            prev_cell=self.latest_map.pose_to_grid(ap)
+            next_cell=self.latest_map.pose_to_grid(npoint)
+            if tuple(prev_cell) == tuple(next_cell):
+               pu.log_msg(self.robot_id,"SIMILAR POINTS: Prev point: {}, Next point: {}".format(ap,npoint),self.debug_mode)
+               continue
+            try:
+                if self.latest_map.is_frontier(prev_cell,next_cell,self.lidar_scan_radius):
+                    potential_fps.append(ap)
+            except:
+                pu.log_msg(self.robot_id,"MEM ERROR Prev: {}, Mem Erro Next: {}".format(prev_cell,next_cell),self.debug_mode)
+                pu.log_msg(self.robot_id,"Got an error whe checking frontier",1-self.debug_mode)
+
+        if potential_fps:
+            pu.log_msg(self.robot_id,'Returned points: {}'.format(len(potential_fps)),self.debug_mode)
+            hull, boundary_points = graham_scan(potential_fps, count, False)
             for ap in boundary_points:
+                pu.log_msg(self.robot_id,"Found frontier point: {}".format(ap),self.debug_mode)
                 pose = Pose()
                 pose.position.x = ap[INDEX_FOR_X]
                 pose.position.y = ap[INDEX_FOR_Y]
                 frontier_points.append(pose)
+        # pu.log_msg(self.robot_id,"Returned frontier points: {}".format(frontier_points),self.debug_mode)
         return FrontierPointResponse(frontiers=frontier_points)
 
     def fetch_explored_region_handler(self, data):

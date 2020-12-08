@@ -177,6 +177,8 @@ class Robot:
         self.exploration_time = rospy.Time.now().to_sec()
         self.candidate_robots = self.relay_robots + self.base_stations
 
+        self.prev_frontier_points=[]
+
         rospy.Service("/robot_{}/home_alert".format(self.robot_id), HomeAlert, self.home_alert_callback)
         rospy.Service("/robot_{}/shared_data".format(self.robot_id), SharedData, self.shared_data_handler)
         self.auction_points_srv = rospy.Service("/robot_{}/auction_points".format(self.robot_id), SharedPoint,
@@ -429,17 +431,17 @@ class Robot:
                 if self.heading_back:
                     self.heading_back = 0  # then you've shared your data and you're all set. continue with exploration
                     self.base_points = copy.deepcopy(self.robot_points)
-            # self.process_data(sender_id,received_buff_data)
-            thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
-            thread.start()
+            self.process_data(sender_id,received_buff_data)
+            # thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
+            # thread.start()
             pu.log_msg(self.robot_id, "Processed alert data", self.debug_mode)
 
     def process_parent_data(self, data, sent_data=[]):
         received_buff_data = data.res_data
         sender_id = received_buff_data.msg_header.header.frame_id
-        # self.process_data(sender_id, received_buff_data)
-        thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
-        thread.start()
+        self.process_data(sender_id, received_buff_data)
+        # thread = Thread(target=self.process_data, args=(sender_id, received_buff_data,))
+        # thread.start()
         self.base_points = copy.deepcopy(self.robot_points)  # received_buff_data.base_map
         data_size = self.get_data_size(received_buff_data.data) + self.get_data_size(sent_data)
         self.report_shared_data(data_size)
@@ -449,21 +451,26 @@ class Robot:
             pu.log_msg(self.robot_id, "Exploration complete!!", self.debug_mode)
         else:
             poses=[]
-            while len(poses)==0:
-                try:
-                    response = self.fetch_frontier_points(FrontierPointRequest(count=len(self.candidate_robots) + 1))
-                    poses = response.frontiers
-                except:
-                      pu.log_msg(self.robot_id,"Error on fetching frontiers",1-self.debug_mode)
-                      sleep(1)
+            # while len(poses)==0:
+            try:
+                response = self.fetch_frontier_points(FrontierPointRequest(count=len(self.candidate_robots) + 1))
+                poses = response.frontiers
+            except:
+                  pu.log_msg(self.robot_id,"Error on fetching frontiers",1-self.debug_mode)
+            # sleep(1)
             # poses = [r.nodes[1] for r in ridges]
             received_points = self.parse_rendezvous_locations(poses)
             self.move_attempt = 0
             if received_points:
-                pu.log_msg(self.robot_id, "Fetched new frontier points", self.debug_mode)
+                self.prev_frontier_points=received_points
+                pu.log_msg(self.robot_id, "Fetched new frontier points: {}, Frontier Point: {}".format(self.prev_frontier_points,self.frontier_point), self.debug_mode)
                 new_point = received_points[0]
             else:
-                new_point = self.get_robot_pose()
+                new_point = self.frontier_point
+                for f in self.prev_frontier_points:
+                    if f != new_point:
+                        new_point=f
+                        break
             self.start_exploration_action(new_point=new_point, direction=TO_FRONTIER)
 
     ''' Helper method to publish a message to any receiver karto_in topic'''
@@ -666,14 +673,14 @@ class Robot:
 
 
     def process_data(self, sender_id, buff_data):
-        self.lock.acquire()
+        # self.lock.acquire()
         data_vals = buff_data.data
         for scan in data_vals:
             self.karto_pub.publish(scan)
         for rid in self.candidate_robots:
             if rid != sender_id:
                 self.add_to_file(rid, data_vals)
-        self.lock.release()
+        # self.lock.release()
 
     def shared_data_handler(self, data):
         pu.log_msg(self.robot_id, "Received request from robot..", self.debug_mode)
@@ -995,10 +1002,10 @@ class Robot:
 
     def delete_data_for_id(self, rid):
         # sleep(2)
-        self.lock.acquire()
+        # self.lock.acquire()
         if rid in self.karto_messages:
             del self.karto_messages[rid]
-        self.lock.release()
+        # self.lock.release()
         return True
 
     def get_angle(self, a, b):
