@@ -26,6 +26,7 @@ import os
 from os.path import exists, getsize
 from std_msgs.msg import String
 import project_utils as pu
+from visualization_msgs.msg import Marker
 
 INF = 1000000000000
 NEG_INF = -1000000000000
@@ -173,9 +174,14 @@ class Robot:
         self.bs_pose = tuple([float(v) for v in bs_poses])
         self.graph_scale = rospy.get_param("/graph_scale")
         self.max_target_info_ratio = rospy.get_param("/max_target_info_ratio")
+        self.method = rospy.get_param("/method")
+        self.robot_count = rospy.get_param("/robot_count")
         self.conn_manager = {}
         self.exploration_time = rospy.Time.now().to_sec()
         self.candidate_robots = self.relay_robots + self.base_stations
+        self.traveled_distance=[]
+        self.traveled_distance=[]
+        self.previous_point=[]
 
         self.prev_frontier_points=[]
 
@@ -247,6 +253,8 @@ class Robot:
         self.shutdown_pub = rospy.Publisher("/shutdown".format(self.robot_id), String, queue_size=10)
         rospy.Subscriber('/shutdown', String, self.save_all_data)
         rospy.Subscriber('/coverage'.format(self.robot_id), Coverage, self.coverage_callback)
+
+        rospy.Subscriber('/robot_{}/navigator/markers'.format(self.robot_id), Marker, self.goal_callback)
         # ======= pose transformations====================
         self.listener = tf.TransformListener()
 
@@ -263,6 +271,17 @@ class Robot:
             # except Exception as e:
             #     pu.log_msg(self.robot_id, "Got Error: {}".format(e), self.debug_mode)
             r.sleep()
+
+
+    def goal_callback(self,data):
+        rospy.logerr('Received a new pose: {}'.format(data.pose.position))
+        if len(self.previous_point)==0:
+            self.previous_point= self.get_robot_pose()
+        goal =[0.0]*2
+        goal[pu.INDEX_FOR_X]=data.pose.position.x
+        goal[pu.INDEX_FOR_X]=data.pose.position.y
+        self.traveled_distance.append({'time': rospy.Time.now().to_sec(),'traved_distance': pu.D(self.previous_point, goal)})
+        self.previous_point=goal
 
     def is_time_to_share(self, rid):
         now = rospy.Time.now().to_sec()
@@ -1050,6 +1069,8 @@ class Robot:
         return self.global_robot_pose
 
     def save_all_data(self,data):
+        if self.robot_type != BS_TYPE:
+            pu.save_data(self.traveled_distance,'{}/traveled_distance_{}_{}_{}_{}_{}_{}.pickle'.format(self.method, self.environment,self.robot_count,self.run,self.termination_metric,self.robot_id,self.max_target_info_ratio))
         rospy.signal_shutdown('Robot {}: Received Shutdown Exploration complete!'.format(self.robot_id))
 
 
