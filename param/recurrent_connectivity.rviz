@@ -5,9 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /R1:Map1
-        - /R2:Map1
-        - /R3:Map1
+        - /R6:Map1
       Splitter Ratio: 0.5
     Tree Height: 871
   - Class: rviz/Selection
@@ -91,7 +89,7 @@ Visualization Manager:
       Color Scheme: map
       Draw Behind: false
       Enabled: true
-      Name: ""
+      Name: R6:Map
       Topic: ""
       Unreliable: false
       Use Timestamp: false
@@ -127,7 +125,59 @@ Visualization Manager:
           Value: true
         robot_1/offset:
           Value: true
+        robot_2/base_footprint:
+          Value: true
+        robot_2/base_laser_link:
+          Value: true
+        robot_2/base_link:
+          Value: true
         robot_2/map:
+          Value: true
+        robot_2/odom:
+          Value: true
+        robot_2/offset:
+          Value: true
+        robot_3/base_footprint:
+          Value: true
+        robot_3/base_laser_link:
+          Value: true
+        robot_3/base_link:
+          Value: true
+        robot_3/map:
+          Value: true
+        robot_3/odom:
+          Value: true
+        robot_3/offset:
+          Value: true
+        robot_4/base_footprint:
+          Value: true
+        robot_4/base_laser_link:
+          Value: true
+        robot_4/base_link:
+          Value: true
+        robot_4/map:
+          Value: true
+        robot_4/odom:
+          Value: true
+        robot_4/offset:
+          Value: true
+        robot_5/base_footprint:
+          Value: true
+        robot_5/base_laser_link:
+          Value: true
+        robot_5/base_link:
+          Value: true
+        robot_5/map:
+          Value: true
+        robot_5/odom:
+          Value: true
+        robot_5/offset:
+          Value: true
+        robot_6/map:
+          Value: true
+        robot_6/odom:
+          Value: true
+        robot_6/offset:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -151,7 +201,37 @@ Visualization Manager:
                     robot_1/base_laser_link:
                       {}
           robot_2/map:
-            {}
+            robot_2/offset:
+              robot_2/odom:
+                robot_2/base_footprint:
+                  robot_2/base_link:
+                    robot_2/base_laser_link:
+                      {}
+          robot_3/map:
+            robot_3/offset:
+              robot_3/odom:
+                robot_3/base_footprint:
+                  robot_3/base_link:
+                    robot_3/base_laser_link:
+                      {}
+          robot_4/map:
+            robot_4/offset:
+              robot_4/odom:
+                robot_4/base_footprint:
+                  robot_4/base_link:
+                    robot_4/base_laser_link:
+                      {}
+          robot_5/map:
+            robot_5/offset:
+              robot_5/odom:
+                robot_5/base_footprint:
+                  robot_5/base_link:
+                    robot_5/base_laser_link:
+                      {}
+          robot_6/map:
+            robot_6/offset:
+              robot_6/odom:
+                {}
       Update Interval: 0
       Value: true
     - Class: rviz/Marker
@@ -159,7 +239,7 @@ Visualization Manager:
       Marker Topic: /robot_0/navigator/markers
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -167,8 +247,18 @@ Visualization Manager:
       Marker Topic: /robot_1/navigator/markers
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
+      Value: true
+    - Alpha: 0.699999988079071
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: R6:Map
+      Topic: /robot_6/map
+      Unreliable: false
+      Use Timestamp: false
       Value: true
   Enabled: true
   Global Options:
@@ -207,7 +297,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 27.274309158325195
+      Scale: 11.146344184875488
       Target Frame: dxl_base
       Value: TopDownOrtho (rviz)
       X: 34.93389129638672
@@ -259,5 +349,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1920
-  X: 0
-  Y: 0
+  X: 67
+  Y: 27

@@ -271,7 +271,8 @@ class Graph:
         self.last_intersection = None
         self.latest_map = None
         self.prev_ridge = None
-        rospy.init_node("graph_node")
+        self.latest_occ_grid=None
+        rospy.init_node("graph",anonymous=True)
         self.robot_id = rospy.get_param("~robot_id")
         self.robot_type = rospy.get_param("~robot_type")
 
@@ -295,14 +296,13 @@ class Graph:
         self.slope_bias = rospy.get_param("/slope_bias".format(self.robot_id))
         self.separation_bias = rospy.get_param("/separation_bias".format(self.robot_id)) * self.graph_scale
         self.opposite_vector_bias = rospy.get_param("/opposite_vector_bias".format(self.robot_id))
+
         rospy.Service('/robot_{}/rendezvous'.format(self.robot_id), RendezvousPoints,
                       self.fetch_rendezvous_points_handler)
         rospy.Service('/robot_{}/frontier_points'.format(self.robot_id), FrontierPoint, self.frontier_point_handler)
-        rospy.Service('/robot_{}/explored_region'.format(self.robot_id), ExploredRegion,
-                      self.fetch_explored_region_handler)
-        self.get_map = rospy.ServiceProxy('/robot_{}/static_map'.format(self.robot_id), GetMap)
-        if self.robot_type == 1:
-            self.get_map = rospy.ServiceProxy('/robot_0/static_map'.format(self.robot_id), GetMap)
+
+        rospy.Subscriber('/robot_{}/map'.format(self.robot_id), OccupancyGrid, self.map_callback,queue_size = 100)
+        # self.grid_pub=rospy.Publisher('/robot_{}/grid_poses'.format(self.robot_id), Frontier,queue_size = 1)
         rospy.Subscriber('/shutdown', String, self.shutdown_callback)
         self.last_frontier_points=[]
         self.listener = tf.TransformListener()
@@ -318,11 +318,23 @@ class Graph:
                 rospy.logerr('Robot {}: Graph node interrupted!: {}'.format(self.robot_id, e))
 
     def generate_graph(self):
-        try:
-            self.latest_map = Grid(self.get_map().map)
-        except rospy.ServiceException:
-            pu.log_msg(self.robot_id, "Map didn't update", self.debug_mode)
-            return
+        while not self.latest_occ_grid:
+            rospy.logerr('Waiting for map')
+            sleep(1)
+        rospy.logerr('Map received')
+        self.latest_map=Grid(self.latest_occ_grid)
+        poses = self.latest_map.get_explored_region()
+        fpts=Frontier()
+        fpts.frontiers = []
+        for p in poses:
+            pose = Pose()
+            pose.position.x = p[0]
+            pose.position.y = p[1]
+            fpts.frontiers.append(pose)
+            # self.grid_pub.publish(fpts)
+
+    def map_callback(self,occ_msg):
+        self.latest_occ_grid=occ_msg
 
     def transform_pose(self, pose,fpoint):
         theta = pu.theta(pose,fpoint)
@@ -367,19 +379,10 @@ class Graph:
         # pu.log_msg(self.robot_id,"Returned frontier points: {}".format(frontier_points),self.debug_mode)
         return FrontierPointResponse(frontiers=frontier_points)
 
-    def fetch_explored_region_handler(self, data):
-        self.generate_graph()
-        poses = self.latest_map.get_explored_region()
-        exp_points = []
-        for p in poses:
-            pose = Pose()
-            pose.position.x = round(p[INDEX_FOR_X], 1)
-            pose.position.y = round(p[INDEX_FOR_Y], 1)
-            exp_points.append(pose)
-        return ExploredRegionResponse(poses=exp_points, resolution=self.map_resolution)
 
     def fetch_rendezvous_points_handler(self, data):
         count = data.count
+        rospy.logerr('Rendezvous request received')
         self.generate_graph()
         rendezvous_points = []
         origin = self.get_robot_pose()

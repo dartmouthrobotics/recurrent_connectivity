@@ -1,13 +1,38 @@
 <launch>
+    <arg name="world" default="maze"/>
+    <arg name="robot_count" default="4"/>
+    <arg name="run" default="0"/>
+    <arg name="method" default="recurrent_connectivity"/>
+    <arg name="bs_pose" default="0,0"/>
+    <arg name="environment"  default=''/>
+
     <param name="use_sim_time" value="true" />
     <node name="Stage" pkg="stage_ros" type="stageros" args="$(find gvgexploration)/world/$(arg world).world">
         <param name="base_watchdog_timeout" value="0" />
     </node>
+
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find gvgexploration)/param/$(arg environment)_map.yaml">
+        <remap from="map" to="latched_map"/>
+    </node>
+
     <rosparam command="load" file="$(find gvgexploration)/param/gvg_config.yaml" subst_value="true"/>
+
+    <group ns="robot_4">
+        <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
+        <include file="$(find gvgexploration)/launch/nodes.launch">
+            <arg name="robot" value="5"/>
+        </include>
+        <include file="$(find recurrent_connectivity)/launch/robot.launch">
+            <arg name="robot_name" value="4" />
+            <arg name="robot_type" value="1" />
+            <arg name="relay_robots" value="0,1,2,3" />
+        </include>
+    </group>
+
     <group ns="robot_0">
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <include file="$(find gvgexploration)/launch/nodes.launch">
-            <arg name="robot_name" value="1"/>
+            <arg name="robot" value="1"/>
         </include>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
             <arg name="robot_name" value="0" />
@@ -21,7 +46,7 @@
     <group ns="robot_1">
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <include file="$(find gvgexploration)/launch/nodes.launch">
-            <arg name="robot_name" value="2"/>
+            <arg name="robot" value="2"/>
         </include>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
             <arg name="robot_name" value="1" />
@@ -34,7 +59,7 @@
     <group ns="robot_2">
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <include file="$(find gvgexploration)/launch/nodes.launch">
-            <arg name="robot_name" value="3"/>
+            <arg name="robot" value="3"/>
         </include>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
             <arg name="robot_name" value="2" />
@@ -47,25 +72,13 @@
     <group ns="robot_3">
         <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
         <include file="$(find gvgexploration)/launch/nodes.launch">
-            <arg name="robot_name" value="4"/>
+            <arg name="robot" value="4"/>
         </include>
         <include file="$(find recurrent_connectivity)/launch/robot.launch">
             <arg name="robot_name" value="3" />
             <arg name="robot_type" value="2" />
             <arg name="base_stations" value="4" />
             <arg name="relay_robots" value="0,1,2" />
-        </include>
-    </group>
-
-    <group ns="robot_4">
-        <node pkg="nav2d_navigator" type="explore_client" name="explore_client"/>
-        <include file="$(find gvgexploration)/launch/nodes.launch">
-            <arg name="robot_name" value="5"/>
-        </include>
-        <include file="$(find recurrent_connectivity)/launch/robot.launch">
-            <arg name="robot_name" value="4" />
-            <arg name="robot_type" value="1" />
-            <arg name="relay_robots" value="0,1,2,3" />
         </include>
     </group>
 
